@@ -187,8 +187,6 @@ cc_defaults {
     name: "hwui_compile_for_perf",
     // TODO: Non-arm?
     cflags: [
-        "-marm",
-        "-mapcs"
     ],
 }
 
