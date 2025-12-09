@@ -35,6 +35,7 @@ import android.hardware.input.InputManagerGlobal;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.LongSparseArray;
@@ -197,6 +198,11 @@ public class ViewConfiguration {
      * (in dips)
      */
     private static final int DOUBLE_TAP_TOUCH_SLOP = TOUCH_SLOP;
+
+    /**
+     * Add new system property to set touch slop.
+     */
+    private static final String KEY_TOUCH_SLOP = "ro.view.configuration.touch.slop";
 
     /**
      * Distance a touch can wander before we think the user is attempting a paged scroll
@@ -547,7 +553,7 @@ public class ViewConfiguration {
         }
 
         mFadingMarqueeEnabled = res.getBoolean(R.bool.config_ui_enableFadingMarquee);
-        mTouchSlop = res.getDimensionPixelSize(R.dimen.config_viewConfigurationTouchSlop);
+        mTouchSlop = resolveTouchSlop(res);
         mHandwritingSlop = res.getDimensionPixelSize(
                 R.dimen.config_viewConfigurationHandwritingSlop);
         mHoverSlop = res.getDimensionPixelSize(R.dimen.config_viewConfigurationHoverSlop);
@@ -615,6 +621,27 @@ public class ViewConfiguration {
         mScrollFriction = res.getFloat(R.dimen.config_scrollFriction);
 
         mDeviceId = context.getDeviceId();
+    }
+
+    /**
+     * Returns touch slop px.
+     * @hide
+     */
+    private static int resolveTouchSlop(Resources res) {
+        final int defaultTouchSlopPx =
+                res.getDimensionPixelSize(R.dimen.config_viewConfigurationTouchSlop);
+        final int propValDp = SystemProperties.getInt(KEY_TOUCH_SLOP, -1);
+
+        if (propValDp < 1) {
+            return defaultTouchSlopPx;
+        } else {
+            final float pxF = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    (float) propValDp,
+                    res.getDisplayMetrics());
+            final int touchSlopPx = Math.round(pxF);
+            return Math.min(touchSlopPx, defaultTouchSlopPx);
+        }
     }
 
     /**
