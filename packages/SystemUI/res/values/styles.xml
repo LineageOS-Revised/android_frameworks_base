@@ -1745,4 +1745,9 @@
         <item name="android:windowMinWidthMajor">60%</item>
         <item name="android:windowMinWidthMinor">100%</item>
     </style>
+
+    <style name="TextAppearance.Notifications.reTicker" parent="@*android:style/TextAppearance.StatusBar.Icon">
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">@*android:string/config_bodyFontFamily</item>
+    </style>
 </resources>
