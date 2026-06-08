@@ -295,4 +295,7 @@
         <item>#1AA64A</item>
         <item>#D37B00</item>
     </array>
+
+    <!-- reTicker -->
+    <color name="reticker_background_color">@android:color/system_neutral1_50</color>
 </resources>
