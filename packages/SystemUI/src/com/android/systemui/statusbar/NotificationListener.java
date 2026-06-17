@@ -149,6 +149,7 @@ public class NotificationListener extends NotificationListenerWithPlugins implem
                 Log.wtf(TAG, "Missing ranking after plugins for " + key);
             }
             mMainExecutor.execute(() -> {
+                com.android.systemui.util.ScrimUtils.get().onNotificationPosted(sbn);
                 for (NotificationHandler handler : mNotificationHandlers) {
                     handler.onNotificationPosted(sbn, rankingMap);
                 }
@@ -173,6 +174,7 @@ public class NotificationListener extends NotificationListenerWithPlugins implem
                         + " reason " + reason);
             }
             mMainExecutor.execute(() -> {
+                com.android.systemui.util.ScrimUtils.get().onNotificationRemoved(sbn);
                 for (NotificationHandler handler : mNotificationHandlers) {
                     handler.onNotificationRemoved(sbn, rankingMap, reason);
                 }

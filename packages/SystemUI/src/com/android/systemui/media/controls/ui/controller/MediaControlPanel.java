@@ -886,6 +886,10 @@ public class MediaControlPanel {
             Drawable artwork;
             boolean isArtworkBound;
             Icon artworkIcon = data.getArtwork();
+            android.graphics.Rect bounds = mContext.getSystemService(android.view.WindowManager.class).getCurrentWindowMetrics().getBounds();
+            int screenWidth = bounds.width();
+            int screenHeight = bounds.height();
+            Drawable albumArt = getScaledBackground(artworkIcon, screenWidth, screenHeight);
             WallpaperColors wallpaperColors = getWallpaperColor(artworkIcon);
             boolean darkTheme = false;
             if (wallpaperColors != null) {
@@ -915,6 +919,13 @@ public class MediaControlPanel {
                     return;
                 }
                 mArtworkBoundId = reqId;
+
+                if (albumArt != null) {
+                    com.android.systemui.media.MediaSessionManager.Companion.get().onAlbumArtChanged(albumArt);
+                }
+                if (colorScheme != null && colorScheme.getAccent1() != null) {
+                    com.android.systemui.media.MediaSessionManager.Companion.get().onMediaColorsChanged(colorScheme.getAccent1().getS100());
+                }
 
                 // Transition Colors to current color scheme
                 boolean colorSchemeChanged;
@@ -965,6 +976,10 @@ public class MediaControlPanel {
                         appIconView.setImageResource(R.drawable.ic_music_note);
                         appIconView.setColorFilter(Color.WHITE);
                     }
+                }
+                Drawable resolvedAppIcon = appIconView.getDrawable();
+                if (resolvedAppIcon != null) {
+                    com.android.systemui.media.MediaSessionManager.Companion.get().onAppIconChanged(resolvedAppIcon);
                 }
                 Trace.endAsyncSection(traceName, traceCookie);
             });
