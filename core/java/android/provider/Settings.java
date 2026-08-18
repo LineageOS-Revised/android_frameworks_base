@@ -6930,6 +6930,11 @@ public final class Settings {
         /**
          * @hide
          */
+        public static final String SCREENSHOT_CLIPBOARD_ONLY = "screenshot_clipboard_only";
+
+        /**
+         * @hide
+         */
         public static final String HIDE_STATUS_BAR_IN_SCREENSHOT = "hide_status_bar_in_screenshot";
 
         /**
