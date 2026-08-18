@@ -154,4 +154,7 @@
     <string name="weather_condition_snow">Snowy</string>
     <string name="weather_condition_wind">Windy</string>
     <string name="weather_condition_mist">Misty</string>
+
+    <!-- Label for UI element which writes a clipboard-only screenshot to storage [CHAR LIMIT=30] -->
+    <string name="screenshot_save_to_storage_label">Save to storage</string>
 </resources>
