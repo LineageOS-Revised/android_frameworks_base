@@ -418,7 +418,7 @@ std::chrono::nanoseconds RenderThread::estimateCallbacksExpectedDuration() const
 }
 
 bool RenderThread::threadLoop() {
-    setpriority(PRIO_PROCESS, 0, PRIORITY_DISPLAY);
+    setpriority(PRIO_PROCESS, 0, PRIORITY_URGENT_DISPLAY);
     Looper::setForThread(mLooper);
     if (gOnStartHook) {
         gOnStartHook("RenderThread");
