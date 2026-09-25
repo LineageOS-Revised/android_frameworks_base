@@ -71,6 +71,12 @@
     <string name="accessibility_quick_settings_caffeine_off">Caffeine off.</string>
     <string name="accessibility_quick_settings_caffeine_on">Caffeine on.</string>
 
+    <!-- CPU info QS tile -->
+    <string name="quick_settings_cpu_info_label">CPU info</string>
+    <string name="accessibility_quick_settings_cpu_info_off">CPU info overlay off.</string>
+    <string name="accessibility_quick_settings_cpu_info_on">CPU info overlay on.</string>
+    <string name="cpu_info_overlay_text">CPU <xliff:g id="load" example="24%">%1$s</xliff:g> <xliff:g id="freq" example="2.40GHz">%2$s</xliff:g> <xliff:g id="temp" example="43°C">%3$s</xliff:g></string>
+
     <!-- FPS info QS tile -->
     <string name="quick_settings_fps_info_label">FPS info</string>
     <string name="accessibility_quick_settings_fps_info_off">FPS info overlay off.</string>
