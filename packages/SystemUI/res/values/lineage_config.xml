@@ -79,4 +79,10 @@
 
     <!-- Whether to force notifications to take up the full width of the screen in landscape -->
     <bool name="config_fullWidthNotificationsInLandscape">false</bool>
+
+    <!-- FPS info nodes -->
+    <string-array name="config_fpsInfoNodePaths" translatable="false">
+        <item>/sys/class/drm/sde-crtc-0/measured_fps</item>
+        <item>/sys/class/drm/card0-sde-crtc-0/measured_fps</item>
+    </string-array>
 </resources>
