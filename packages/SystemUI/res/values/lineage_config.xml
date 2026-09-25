@@ -84,4 +84,15 @@
         <item>/sys/class/drm/sde-crtc-0/measured_fps</item>
         <item>/sys/class/drm/card0-sde-crtc-0/measured_fps</item>
     </string-array>
+
+    <!-- Thermal zone types used to read the CPU temperature, in order of
+         preference. The first matching zone is used. Devices exposing the CPU
+         temperature with a different type can override this array with a
+         device overlay. -->
+    <string-array name="config_cpuInfoTempNodeTypes" translatable="false">
+        <item>cpu-0-0-0</item>
+        <item>cpu-0-0</item>
+        <item>cpu-therm</item>
+        <item>soc_thermal</item>
+    </string-array>
 </resources>

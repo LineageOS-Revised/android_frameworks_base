@@ -23,6 +23,7 @@ import com.android.systemui.qs.tileimpl.QSTileImpl
 import com.android.systemui.qs.tiles.AmbientDisplayTile
 import com.android.systemui.qs.tiles.AODTile
 import com.android.systemui.qs.tiles.CaffeineTile
+import com.android.systemui.qs.tiles.CpuInfoTile
 import com.android.systemui.qs.tiles.FpsInfoTile
 import com.android.systemui.qs.tiles.HeadsUpTile
 import com.android.systemui.qs.tiles.PowerShareTile
@@ -60,6 +61,12 @@ interface LineageModule {
     @IntoMap
     @StringKey(CaffeineTile.TILE_SPEC)
     fun bindCaffeineTile(caffeineTile: CaffeineTile): QSTileImpl<*>
+
+    /** Inject CpuInfoTile into tileMap in QSModule */
+    @Binds
+    @IntoMap
+    @StringKey(CpuInfoTile.TILE_SPEC)
+    fun bindCpuInfoTile(cpuInfoTile: CpuInfoTile): QSTileImpl<*>
 
     /** Inject FpsInfoTile into tileMap in QSModule */
     @Binds
@@ -113,6 +120,7 @@ interface LineageModule {
         const val AMBIENT_DISPLAY_TILE_SPEC = "ambient_display"
         const val AOD_TILE_SPEC = "aod"
         const val CAFFEINE_TILE_SPEC = "caffeine"
+        const val CPU_INFO_TILE_SPEC = "cpu_info"
         const val FPS_INFO_TILE_SPEC = "fps_info"
         const val HEADS_UP_TILE_SPEC = "heads_up"
         const val POWERSHARE_TILE_SPEC = "powershare"
@@ -165,6 +173,21 @@ interface LineageModule {
                     ),
                 instanceId = uiEventLogger.getNewInstanceId(),
                 category = TileCategory.DISPLAY,
+            )
+
+        @Provides
+        @IntoMap
+        @StringKey(CPU_INFO_TILE_SPEC)
+        fun provideCpuInfoTileConfig(uiEventLogger: QsEventLogger): QSTileConfig =
+            QSTileConfig(
+                tileSpec = TileSpec.create(CPU_INFO_TILE_SPEC),
+                uiConfig =
+                    QSTileUIConfig.Resource(
+                        iconRes = R.drawable.ic_qs_cpu_info,
+                        labelRes = R.string.quick_settings_cpu_info_label
+                    ),
+                instanceId = uiEventLogger.getNewInstanceId(),
+                category = TileCategory.UTILITIES,
             )
 
         @Provides
