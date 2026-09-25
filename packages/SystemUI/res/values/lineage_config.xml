@@ -76,4 +76,12 @@
 
     <!-- Whether to play turbulence noise after clicking the play button -->
     <bool name="config_turbulenceNoise">true</bool>
+
+    <!-- Sysfs nodes exposing the measured display fps, in order of preference.
+         The first readable node is used. Devices using a different path can
+         override this array with a device overlay. -->
+    <string-array name="config_fpsInfoNodePaths" translatable="false">
+        <item>/sys/class/drm/sde-crtc-0/measured_fps</item>
+        <item>/sys/class/drm/card0-sde-crtc-0/measured_fps</item>
+    </string-array>
 </resources>
