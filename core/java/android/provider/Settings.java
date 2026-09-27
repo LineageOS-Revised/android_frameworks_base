@@ -5510,6 +5510,14 @@ public final class Settings {
         public static final String PEAK_REFRESH_RATE = "peak_refresh_rate";
 
         /**
+         * The user selected refresh rate per app, as a semicolon separated list of
+         * "package=rate" pairs. Apps without an entry use the system default.
+         * @hide
+         */
+        @Readable
+        public static final String PER_APP_REFRESH_RATE = "per_app_refresh_rate";
+
+        /**
          * Control lock behavior on fold
          *
          * If this isn't set, the system falls back to a device specific default.

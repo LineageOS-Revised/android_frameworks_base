@@ -862,6 +862,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Global.MAXIMUM_OBSCURING_OPACITY_FOR_TOUCH);
         private final Uri mDevelopmentOverrideDesktopExperienceUri = Settings.Global.getUriFor(
                 Settings.Global.DEVELOPMENT_OVERRIDE_DESKTOP_EXPERIENCE_FEATURES);
+        private final Uri mPerAppRefreshRateUri =
+                Settings.System.getUriFor(Settings.System.PER_APP_REFRESH_RATE);
+
+        @GuardedBy("mGlobalLock")
+        private final ArrayMap<String, Float> mPerAppRefreshRates = new ArrayMap<>();
 
         public SettingsObserver() {
             super(new Handler());
@@ -897,6 +902,8 @@ public class WindowManagerService extends IWindowManager.Stub
             resolver.registerContentObserver(mMaximumObscuringOpacityForTouchUri, false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mDevelopmentOverrideDesktopExperienceUri, false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(mPerAppRefreshRateUri, false, this,
                     UserHandle.USER_ALL);
         }
 
@@ -945,6 +952,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 updateMagnifyIme();
             }
 
+            if (mPerAppRefreshRateUri.equals(uri)) {
+                updatePerAppRefreshRate();
+                return;
+            }
+
             if (mDevelopmentOverrideDesktopExperienceUri.equals(uri)) {
                 updateDevelopmentOverrideDesktopExperience();
                 return;
@@ -970,6 +982,7 @@ public class WindowManagerService extends IWindowManager.Stub
             updateMaximumObscuringOpacityForTouch();
             updateDisableSecureWindows();
             updateMagnifyIme();
+            updatePerAppRefreshRate();
         }
 
         void updateMaximumObscuringOpacityForTouch() {
@@ -1092,6 +1105,55 @@ public class WindowManagerService extends IWindowManager.Stub
             synchronized (mGlobalLock) {
                 mMagnifyIme = enabledMagnifyIme;
             }
+        }
+
+        void updatePerAppRefreshRate() {
+            final ArrayMap<String, Float> rates = parsePerAppRefreshRates(
+                    Settings.System.getStringForUser(mContext.getContentResolver(),
+                            Settings.System.PER_APP_REFRESH_RATE, mCurrentUserId));
+            synchronized (mGlobalLock) {
+                for (int i = mPerAppRefreshRates.size() - 1; i >= 0; i--) {
+                    if (!rates.containsKey(mPerAppRefreshRates.keyAt(i))) {
+                        setPerAppRefreshRateLocked(mPerAppRefreshRates.keyAt(i), 0f);
+                        mPerAppRefreshRates.removeAt(i);
+                    }
+                }
+                for (int i = 0; i < rates.size(); i++) {
+                    final String packageName = rates.keyAt(i);
+                    final float rate = rates.valueAt(i);
+                    final Float previous = mPerAppRefreshRates.put(packageName, rate);
+                    if (previous == null || previous != rate) {
+                        setPerAppRefreshRateLocked(packageName, rate);
+                    }
+                }
+            }
+        }
+
+        private void setPerAppRefreshRateLocked(String packageName, float rate) {
+            mRoot.forAllDisplays(dc -> dc.getDisplayPolicy().getRefreshRatePolicy()
+                    .setPerAppRefreshRate(packageName, rate));
+        }
+
+        private static ArrayMap<String, Float> parsePerAppRefreshRates(String value) {
+            final ArrayMap<String, Float> rates = new ArrayMap<>();
+            if (value == null || value.isEmpty()) {
+                return rates;
+            }
+            for (String entry : value.split(";")) {
+                final int separator = entry.indexOf('=');
+                if (separator <= 0 || separator == entry.length() - 1) {
+                    continue;
+                }
+                try {
+                    final float rate = Float.parseFloat(entry.substring(separator + 1));
+                    if (rate > 0) {
+                        rates.put(entry.substring(0, separator), rate);
+                    }
+                } catch (NumberFormatException e) {
+                    // Skip malformed entries.
+                }
+            }
+            return rates;
         }
     }
 
@@ -4187,6 +4249,7 @@ public class WindowManagerService extends IWindowManager.Stub
             // This call is crucial on user switch to ensure the Magnify IME state
             // is correctly re-evaluated and applied for the new user.
             mSettingsObserver.updateMagnifyIme();
+            mSettingsObserver.updatePerAppRefreshRate();
         }
     }
 

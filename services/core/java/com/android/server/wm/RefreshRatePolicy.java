@@ -62,6 +62,7 @@ class RefreshRatePolicy {
     private final PackageRefreshRate mNonHighRefreshRatePackages = new PackageRefreshRate();
     private final HighRefreshRateDenylist mHighRefreshRateDenylist;
     private final WindowManagerService mWmService;
+    private final HashMap<String, Float> mPerAppRefreshRates = new HashMap<>();
     private float mMinSupportedRefreshRate;
     private float mMaxSupportedRefreshRate;
 
@@ -123,6 +124,20 @@ class RefreshRatePolicy {
 
     void removeRefreshRateRangeForPackage(String packageName) {
         mNonHighRefreshRatePackages.remove(packageName);
+        mWmService.requestTraversal();
+    }
+
+    /**
+     * Sets the user selected refresh rate of the package, or clears it when the refresh rate is
+     * not positive. Camera refresh rate ranges take precedence while a camera session is active.
+     */
+    void setPerAppRefreshRate(String packageName, float refreshRate) {
+        if (refreshRate > 0) {
+            mPerAppRefreshRates.put(packageName, Math.max(mMinSupportedRefreshRate,
+                    Math.min(mMaxSupportedRefreshRate, refreshRate)));
+        } else {
+            mPerAppRefreshRates.remove(packageName);
+        }
         mWmService.requestTraversal();
     }
 
@@ -295,6 +310,11 @@ class RefreshRatePolicy {
             return range.min;
         }
 
+        final Float perAppRefreshRate = mPerAppRefreshRates.get(packageName);
+        if (perAppRefreshRate != null) {
+            return perAppRefreshRate;
+        }
+
         return 0;
     }
 
@@ -314,6 +334,11 @@ class RefreshRatePolicy {
         RefreshRateRange range = mNonHighRefreshRatePackages.get(packageName);
         if (range != null) {
             return range.max;
+        }
+
+        final Float perAppRefreshRate = mPerAppRefreshRates.get(packageName);
+        if (perAppRefreshRate != null) {
+            return perAppRefreshRate;
         }
 
         return 0;
