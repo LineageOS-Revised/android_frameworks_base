@@ -161,6 +161,7 @@ import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionCont
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.statusbar.policy.dagger.StatusBarPolicyModule;
 import com.android.systemui.statusbar.quickactions.dagger.StatusBarFeaturePodsModule;
+import com.android.systemui.statusbar.quickactions.media.MediaControlChipModule;
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsModule;
 import com.android.systemui.statusbar.ui.binder.StatusBarViewBinderModule;
 import com.android.systemui.statusbar.window.StatusBarWindowModule;
@@ -262,6 +263,7 @@ import javax.inject.Named;
         MediaProjectionModule.class,
         MediaProjectionTaskSwitcherModule.class,
         MediaRouterModule.class,
+        MediaControlChipModule.class,
         MotionCuesModule.class,
         MSDLModule.class,
         NotificationRowModule.class,

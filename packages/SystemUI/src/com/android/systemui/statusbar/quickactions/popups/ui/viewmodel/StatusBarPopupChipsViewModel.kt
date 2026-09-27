@@ -88,36 +88,43 @@ constructor(
     }
 
     val shownQuickActionChips: List<QuickActionChipModel> by derivedStateOf {
-        if (StatusBarPopupChips.isEnabled) {
-            val bundle = incomingQuickActionChipBundle
-
-            listOfNotNull(
+        val bundle = incomingQuickActionChipBundle
+        val candidateChips =
+            if (StatusBarPopupChips.isEnabled) {
+                listOfNotNull(
                     bundle.media,
                     bundle.privacy,
                     bundle.shareScreen,
                     bundle.largeScreenRecording,
                 )
-                .filterIsInstance<QuickActionChipModel.PopupChip>()
-                .map { chip ->
-                    chip.copy(
-                        isPopupShown = chip.chipId == currentActiveQuickActionId,
-                        togglePopup = { _, anchorBounds ->
-                            quickActionsInteractor.toggle(
-                                QuickActionPanelModel(
-                                    chipId = chip.chipId,
-                                    anchorBounds = anchorBounds,
-                                    panelContentViewModelFactory = chip.popupViewModelFactory!!,
-                                )
+            } else {
+                // Keep media ticker available even when popup chips modernization is disabled.
+                listOfNotNull(bundle.media)
+            }
+
+        candidateChips
+            .filterIsInstance<QuickActionChipModel.PopupChip>()
+            .map { chip ->
+                chip.copy(
+                    isPopupShown = chip.chipId == currentActiveQuickActionId,
+                    togglePopup = { _, anchorBounds ->
+                        quickActionsInteractor.toggle(
+                            QuickActionPanelModel(
+                                chipId = chip.chipId,
+                                anchorBounds = anchorBounds,
+                                panelContentViewModelFactory = chip.popupViewModelFactory!!,
                             )
-                        },
-                    )
-                } +
+                        )
+                    },
+                )
+            } +
+            if (StatusBarPopupChips.isEnabled) {
                 listOfNotNull(bundle.assistant, bundle.ime).filter {
                     it !is QuickActionChipModel.Hidden
                 }
-        } else {
-            emptyList()
-        }
+            } else {
+                emptyList()
+            }
     }
 
     override suspend fun onActivated() {
