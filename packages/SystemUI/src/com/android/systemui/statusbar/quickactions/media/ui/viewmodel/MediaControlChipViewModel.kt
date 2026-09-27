@@ -16,10 +16,8 @@
 
 package com.android.systemui.statusbar.quickactions.media.ui.viewmodel
 
-import android.content.Context
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.media.domain.interactor.MediaControlChipInteractor
@@ -41,7 +39,6 @@ import kotlinx.coroutines.flow.map
 class MediaControlChipViewModel
 @AssistedInject
 constructor(
-    @Application private val applicationContext: Context,
     mediaControlChipInteractor: MediaControlChipInteractor,
     private val popupViewModelFactory: MediaControlPopupViewModel.Factory,
 ) : StatusBarPopupChipViewModel, HydratedActivatable() {
@@ -102,19 +99,12 @@ constructor(
         val contentDescription = appName?.let { ContentDescription.Loaded(description = it) }
 
         val defaultIcon =
-            when (this) {
-                is MediaControlChipModel.Legacy -> {
-                    appIcon?.loadDrawable(applicationContext)?.let {
-                        Icon.Loaded(drawable = it, contentDescription = contentDescription)
-                    }
-                        ?: Icon.Resource(
-                            resId = com.android.internal.R.drawable.ic_audio_media,
-                            contentDescription = contentDescription,
-                        )
-                }
-
-                is MediaControlChipModel.Compose -> appIcon
-            }
+            artworkIcon
+                ?: appIcon
+                ?: Icon.Resource(
+                    resId = com.android.internal.R.drawable.ic_audio_media,
+                    contentDescription = contentDescription,
+                )
 
         return ChipIcon(icon = defaultIcon)
     }

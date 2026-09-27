@@ -83,7 +83,8 @@ import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombine
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
 import com.android.systemui.statusbar.quickactions.ime.domain.interactor.ImeIndicatorChipInteractor
-import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
+import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipModel
+import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.DynamicIslandChipsViewModel
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipsViewModel
 import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipModel
 import com.android.systemui.statusbar.systemstatusicons.domain.interactor.SystemStatusIconBlocklistInteractor
@@ -196,6 +197,9 @@ interface HomeStatusBarViewModel : Activatable {
     /** The popup chips that should be shown on the right-hand side of the status bar. */
     val popupChips: List<QuickActionChipModel>
 
+    /** The chips that should be shown inside the dynamic island. */
+    val dynamicIslandChips: List<PopupChipModel.Shown>
+
     /**
      * True if the status bar should be visible.
      *
@@ -302,6 +306,7 @@ constructor(
     shareToAppChipViewModel: ShareToAppChipViewModel,
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
     statusBarPopupChipsViewModelFactory: StatusBarPopupChipsViewModel.Factory,
+    dynamicIslandChipsViewModelFactory: DynamicIslandChipsViewModel.Factory,
     @DisplayAware animations: SystemStatusEventAnimationInteractor,
     @DisplayAware statusBarContentInsetsViewModel: StatusBarContentInsetsViewModel,
     @DisplayAware bgDisplayScope: CoroutineScope,
@@ -318,6 +323,10 @@ constructor(
 
     private val statusBarPopupChips by lazy {
         statusBarPopupChipsViewModelFactory.create(thisDisplayId)
+    }
+
+    private val dynamicIslandChipsViewModel by lazy {
+        dynamicIslandChipsViewModelFactory.create()
     }
 
     override val systemStatusIconBlockListInteractor: SystemStatusIconBlocklistInteractor =
@@ -350,6 +359,9 @@ constructor(
 
     override val popupChips
         get() = statusBarPopupChips.shownQuickActionChips
+
+    override val dynamicIslandChips
+        get() = dynamicIslandChipsViewModel.shownPopupChips
 
     override val areNotificationsLightsOut: Flow<Boolean> =
         combine(
@@ -676,9 +688,8 @@ constructor(
 
     override suspend fun onActivated() {
         coroutineScope {
-            if (StatusBarPopupChips.isEnabled) {
-                launch { statusBarPopupChips.activate() }
-            }
+            launch { statusBarPopupChips.activate() }
+            launch { dynamicIslandChipsViewModel.activate() }
             launch { uiEventLogger.hydrateUiEventLogging(chipsFlow = chipsVisibilityModel) }
             awaitCancellation()
         }

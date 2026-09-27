@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.pipeline.shared.ui.composable
 
 import android.content.Context
 import android.graphics.Rect
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +60,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -82,6 +85,7 @@ import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDispla
 import com.android.systemui.headline.ui.compose.Headline
 import com.android.systemui.headline.ui.compose.drawWithHeadlineScrim
 import com.android.systemui.headline.ui.viewmodel.HeadlineViewModel
+import com.android.keyguard.AlphaOptimizedLinearLayout
 import com.android.systemui.initOnBackPressedDispatcherOwner
 import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.rememberViewModel
@@ -89,6 +93,7 @@ import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.lifecycle.viewModel
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
+import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.ui.view.WindowRootView
 import com.android.systemui.shade.ui.composable.VariableDayDate
 import com.android.systemui.statusbar.StatusBarAlwaysUseRegionSampling
@@ -99,6 +104,7 @@ import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.ConnectedDisplaysStatusBarNotificationIconViewStore
+import com.android.systemui.statusbar.quickactions.popups.ui.compose.StatusBarDynamicIslandContainer
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerStatusBarViewBinder
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
 import com.android.systemui.statusbar.notification.shared.StatusBarHeadline
@@ -286,6 +292,45 @@ fun StatusBarRoot(
                     phoneStatusBarView.requireViewById<NotificationIconContainer>(
                         R.id.notificationIcons
                     )
+
+                // Add a composable container for the dynamic island.
+                val centeredArea =
+                    phoneStatusBarView.requireViewById<AlphaOptimizedLinearLayout>(
+                        R.id.centered_area
+                    )
+
+                val islandComposeView =
+                    ComposeView(context).apply {
+                        layoutParams =
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                            ).apply { gravity = Gravity.CENTER }
+
+                        setViewCompositionStrategy(
+                            if (SceneContainerFlag.isEnabled) {
+                                ViewCompositionStrategy.Default
+                            } else {
+                                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                            }
+                        )
+
+                        setContent {
+                            val activeChips = statusBarViewModel.dynamicIslandChips
+                            LaunchedEffect(activeChips.isEmpty()) {
+                                if (activeChips.isEmpty()) {
+                                    phoneStatusBarView.setDynamicIslandActive(false, 0)
+                                }
+                            }
+                            StatusBarDynamicIslandContainer(
+                                chips = statusBarViewModel.dynamicIslandChips,
+                                onIslandWidthChanged = { widthPx ->
+                                    phoneStatusBarView.setDynamicIslandActive(widthPx > 0, widthPx)
+                                },
+                            )
+                        }
+                    }
+                centeredArea.addView(islandComposeView)
 
                 // If the flag is enabled, create and add a compose section to the end
                 // of the system_icons container
