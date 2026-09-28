@@ -16,8 +16,10 @@
      limitations under the License.
 -->
 <resources>
-    <!-- Weather -->  
-    <dimen name="weather_image_max_size">24dp</dimen>
+    <!-- Weather -->
+    <dimen name="weather_image_max_size">20dp</dimen>
+    <dimen name="weather_icon_text_margin">4dp</dimen>
+    <dimen name="weather_view_top_padding">6dp</dimen>
     <dimen name="weather_humidity_margin_start">16dp</dimen>
 
     <!-- Largest size an avatar might need to be drawn in the power menu user picker -->
