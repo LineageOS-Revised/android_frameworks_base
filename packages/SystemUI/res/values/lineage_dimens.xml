@@ -27,5 +27,5 @@
 
     <!-- Vertical offset applied to the UDFPS unlock animation, relative to the sensor centre.
          Overridable by a SystemUI overlay so each device can tune the spacing. -->
-    <dimen name="udfps_animation_offset">0dp</dimen>
+	<dimen name="udfps_animation_offset">-12dp</dimen>
 </resources>
