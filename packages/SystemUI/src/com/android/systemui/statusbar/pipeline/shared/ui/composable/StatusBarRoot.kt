@@ -316,17 +316,8 @@ fun StatusBarRoot(
                         )
 
                         setContent {
-                            val activeChips = statusBarViewModel.dynamicIslandChips
-                            LaunchedEffect(activeChips.isEmpty()) {
-                                if (activeChips.isEmpty()) {
-                                    phoneStatusBarView.setDynamicIslandActive(false, 0)
-                                }
-                            }
                             StatusBarDynamicIslandContainer(
                                 chips = statusBarViewModel.dynamicIslandChips,
-                                onIslandWidthChanged = { widthPx ->
-                                    phoneStatusBarView.setDynamicIslandActive(widthPx > 0, widthPx)
-                                },
                             )
                         }
                     }
