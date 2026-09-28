@@ -5,7 +5,7 @@
     android:id="@+id/keyguard_weather_area"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingTop="8dp">
+    android:paddingTop="@dimen/weather_view_top_padding">
 
     <!-- Weather Info -->
     <ImageView
@@ -32,8 +32,9 @@
         android:freezesText="true"
         systemui:layout_constraintStart_toEndOf="@id/weather_icon"
         systemui:layout_constraintTop_toTopOf="@id/weather_icon"
+        systemui:layout_constraintBottom_toBottomOf="@id/weather_icon"
         systemui:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="@dimen/weather_icon_text_margin"
         android:layout_marginEnd="24dp" />
 
 </com.android.systemui.weather.WeatherInfoView>
