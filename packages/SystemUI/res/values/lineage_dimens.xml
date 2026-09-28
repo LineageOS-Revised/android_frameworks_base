@@ -24,4 +24,8 @@
 
     <!-- Largest size an avatar might need to be drawn in the power menu user picker -->
     <dimen name="global_actions_avatar_size">24dp</dimen>
+
+    <!-- Vertical offset applied to the UDFPS unlock animation, relative to the sensor centre.
+         Overridable by a SystemUI overlay so each device can tune the spacing. -->
+    <dimen name="udfps_animation_offset">0dp</dimen>
 </resources>
