@@ -83,6 +83,7 @@ import com.android.systemui.biometrics.udfps.NormalizedTouchData;
 import com.android.systemui.biometrics.udfps.SinglePointerTouchProcessor;
 import com.android.systemui.biometrics.udfps.TouchProcessor;
 import com.android.systemui.biometrics.udfps.TouchProcessorResult;
+import com.android.systemui.biometrics.udfpsanim.UdfpsAnimationRepository;
 import com.android.systemui.biometrics.ui.view.UdfpsTouchOverlay;
 import com.android.systemui.biometrics.ui.viewmodel.DefaultUdfpsTouchOverlayViewModel;
 import com.android.systemui.biometrics.ui.viewmodel.DeviceEntryUdfpsTouchOverlayViewModel;
@@ -195,6 +196,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     @NonNull private final SelectedUserInteractor mSelectedUserInteractor;
     @NonNull private final MSDLPlayer mMsdlPlayer;
     private final Lazy<SceneInteractor> mSceneInteractorLazy;
+    @NonNull private final UdfpsAnimationRepository mUdfpsAnimationRepository;
     private final boolean mIgnoreRefreshRate;
     private final KeyguardTransitionInteractor mKeyguardTransitionInteractor;
 
@@ -334,7 +336,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                         mPowerInteractor,
                         mBrightnessMirrorShowingInteractor,
                         mScope,
-                        mSceneInteractorLazy
+                        mSceneInteractorLazy,
+                        mUdfpsAnimationRepository
                     )));
         }
 
@@ -736,7 +739,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             UserActivityNotifier userActivityNotifier,
             Lazy<WakefulnessLifecycle> wakefulnessLifecycle,
             MSDLPlayer msdlPlayer,
-            Lazy<SceneInteractor> sceneInteractorLazy) {
+            Lazy<SceneInteractor> sceneInteractorLazy,
+            @NonNull UdfpsAnimationRepository udfpsAnimationRepository) {
         mContext = context;
         mExecution = execution;
         mVibrator = vibrator;
@@ -791,6 +795,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mPromptUdfpsTouchOverlayViewModel = promptUdfpsTouchOverlayViewModel;
         mMsdlPlayer = msdlPlayer;
         mSceneInteractorLazy = sceneInteractorLazy;
+        mUdfpsAnimationRepository = udfpsAnimationRepository;
 
         mDumpManager.registerDumpable(TAG, this);
 
