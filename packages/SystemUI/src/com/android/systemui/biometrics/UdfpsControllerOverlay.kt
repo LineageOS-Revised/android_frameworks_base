@@ -45,6 +45,7 @@ import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.biometrics.domain.interactor.UdfpsOverlayInteractor
 import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams
+import com.android.systemui.biometrics.udfpsanim.UdfpsAnimationRepository
 import com.android.systemui.biometrics.ui.binder.UdfpsTouchOverlayBinder
 import com.android.systemui.biometrics.ui.view.UdfpsTouchOverlay
 import com.android.systemui.biometrics.ui.viewmodel.DefaultUdfpsTouchOverlayViewModel
@@ -100,6 +101,7 @@ constructor(
     private val brightnessMirrorShowingInteractor: BrightnessMirrorShowingInteractor,
     @Application private val scope: CoroutineScope,
     sceneInteractor: Lazy<SceneInteractor>,
+    private val udfpsAnimationRepository: UdfpsAnimationRepository,
 ) {
     private val currentStateUpdatedToOffAodDozingOrDreaming: Flow<Unit> =
         merge(
@@ -231,6 +233,13 @@ constructor(
                             }
 
                             overlayAttachStateListener?.let { addOnAttachStateChangeListener(it) }
+                            sensorRect = sensorBounds
+                            if (requestReason == REASON_AUTH_KEYGUARD) {
+                                setUdfpsAnimation(
+                                    udfpsAnimationRepository.buildSelectedAnimation(),
+                                    udfpsAnimationRepository.getAnimationOffsetPx(),
+                                )
+                            }
                             addViewNowOrLater(this, null)
                             when (requestReason) {
                                 REASON_AUTH_KEYGUARD ->
@@ -252,7 +261,6 @@ constructor(
                                         udfpsOverlayInteractor = udfpsTouchForwarder,
                                     )
                             }
-                            sensorRect = sensorBounds
                         }
 
                 getTouchOverlay()?.apply {
