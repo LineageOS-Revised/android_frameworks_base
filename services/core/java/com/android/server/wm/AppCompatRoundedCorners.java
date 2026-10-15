@@ -44,6 +44,17 @@ class AppCompatRoundedCorners {
     }
 
     void updateRoundedCornersIfNeeded(@NonNull final WindowState mainWindow) {
+        updateRoundedCornersIfNeeded(mainWindow,
+                mRoundedCornersWindowCondition.test(mainWindow));
+    }
+
+    /**
+     * Same as {@link #updateRoundedCornersIfNeeded(WindowState)} but with the result of the
+     * rounded corners window condition already computed by the caller, so that it is evaluated
+     * only once per update.
+     */
+    void updateRoundedCornersIfNeeded(@NonNull final WindowState mainWindow,
+            boolean isEligibleForRoundedCorners) {
         final SurfaceControl windowSurface = mainWindow.getSurfaceControl();
         if (windowSurface == null || !windowSurface.isValid()) {
             return;
@@ -51,14 +62,22 @@ class AppCompatRoundedCorners {
 
         // cropBounds must be non-null for the cornerRadius to be ever applied.
         mActivityRecord.getSyncTransaction()
-                .setCrop(windowSurface, getCropBoundsIfNeeded(mainWindow))
-                .setCornerRadius(windowSurface, getRoundedCornersRadius(mainWindow));
+                .setCrop(windowSurface,
+                        getCropBoundsIfNeeded(mainWindow, isEligibleForRoundedCorners))
+                .setCornerRadius(windowSurface,
+                        getRoundedCornersRadius(mainWindow, isEligibleForRoundedCorners));
     }
 
     @VisibleForTesting
     @Nullable
     Rect getCropBoundsIfNeeded(@NonNull final WindowState mainWindow) {
-        if (!requiresRoundedCorners(mainWindow)) {
+        return getCropBoundsIfNeeded(mainWindow, mRoundedCornersWindowCondition.test(mainWindow));
+    }
+
+    @Nullable
+    private Rect getCropBoundsIfNeeded(@NonNull final WindowState mainWindow,
+            boolean isEligibleForRoundedCorners) {
+        if (!requiresRoundedCorners(isEligibleForRoundedCorners)) {
             // We don't want corner radius on the window.
             // In the case the ActivityRecord requires a letterboxed animation we never want
             // rounded corners on the window because rounded corners are applied at the
@@ -109,7 +128,13 @@ class AppCompatRoundedCorners {
      * @param mainWindow    The {@link WindowState} to consider for rounded corners calculation.
      */
     int getRoundedCornersRadius(@NonNull final WindowState mainWindow) {
-        if (!requiresRoundedCorners(mainWindow)) {
+        return getRoundedCornersRadius(mainWindow,
+                mRoundedCornersWindowCondition.test(mainWindow));
+    }
+
+    private int getRoundedCornersRadius(@NonNull final WindowState mainWindow,
+            boolean isEligibleForRoundedCorners) {
+        if (!requiresRoundedCorners(isEligibleForRoundedCorners)) {
             return 0;
         }
         final AppCompatLetterboxOverrides letterboxOverrides = mActivityRecord
@@ -134,7 +159,7 @@ class AppCompatRoundedCorners {
         return corner == null ? 0 : corner.getRadius();
     }
 
-    private boolean requiresRoundedCorners(@NonNull final WindowState mainWindow) {
+    private boolean requiresRoundedCorners(boolean isEligibleForRoundedCorners) {
         if (com.android.wm.shell.Flags.enableCreateAnyBubble()) {
             final Task task = mActivityRecord.getTask();
             if (task != null) {
@@ -154,7 +179,7 @@ class AppCompatRoundedCorners {
         }
         final AppCompatLetterboxOverrides letterboxOverrides = mActivityRecord
                 .mAppCompatController.getLetterboxOverrides();
-        return mRoundedCornersWindowCondition.test(mainWindow)
+        return isEligibleForRoundedCorners
                 && letterboxOverrides.isLetterboxActivityCornersRounded();
     }
 
