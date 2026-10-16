@@ -100,6 +100,7 @@ import android.content.pm.ServiceInfo;
 import android.os.Handler;
 import android.os.Trace;
 import android.util.ArraySet;
+import android.util.BoostFramework;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -190,6 +191,14 @@ public class OomAdjusterImpl extends OomAdjuster {
         CACHED_APP_MIN_ADJ,
         UNKNOWN_ADJ,
     };
+
+    //Per Task Boost of top-app renderThread
+    public static BoostFramework mPerfBoost = new BoostFramework();
+    public static int mPerfHandle = -1;
+    public static int mCurAppPid = -1;
+    public static int mCurRenderTid = -1;
+    public static int mCurRenderThreadTid = -1;
+    public static boolean mIsTopAppRenderThreadBoostEnabled = false;
 
     /**
      * Note: Always use the raw adj to call this API.
@@ -613,6 +622,11 @@ public class OomAdjusterImpl extends OomAdjuster {
             HostingTypeProvider hostingTypeProvider) {
         super(serviceLock, procLock, processList, activeUids, adjusterThread, oomConstants,
                 globalState, injector, callback, updateHandler, hostingTypeProvider);
+
+        if(mPerfBoost != null) {
+            mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
+            Slog.i(TAG, "perf: topAppRenderThreadBoost=" + mIsTopAppRenderThreadBoostEnabled);
+        }
 
         if (Flags.enableCapabilityControllerComputation()
                 || Flags.enableProcstateControllerComputation()) {
@@ -1327,6 +1341,39 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
             hasVisibleActivities = true;
             procState = PROCESS_STATE_TOP;
+
+            if(mIsTopAppRenderThreadBoostEnabled) {
+                if(mCurRenderThreadTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
+                    mCurRenderThreadTid = app.getRenderThreadTid();
+                    if (mPerfBoost != null) {
+                        Slog.d(TAG, "TOP-APP: pid:" + app.getPid() + ", processName: "
+                               + app.processName + ", renderThreadTid: " + app.getRenderThreadTid());
+                        if (mPerfHandle >= 0) {
+                            mPerfBoost.perfLockReleaseHandler(mPerfHandle);
+                            mPerfHandle = -1;
+                        }
+                        mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_BOOST_RENDERTHREAD,
+                                                          app.processName, app.getRenderThreadTid(), 1);
+                        Slog.d(TAG, "VENDOR_HINT_BOOST_RENDERTHREAD perfHint was called. mPerfHandle: "
+                               + mPerfHandle);
+                    }
+                }
+            }
+            if (mCurAppPid != app.getPid() && app.getPid() > 0) {
+                mCurAppPid = app.getPid();
+                if (mPerfBoost != null) {
+                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_PASS_PID, app.processName,
+                                        mCurAppPid, BoostFramework.PassPid.APP_PID);
+                }
+            }
+            if (mCurRenderTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
+                mCurRenderTid = app.getRenderThreadTid();
+                if (mPerfBoost != null) {
+                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_PASS_PID, app.processName,
+                                        mCurRenderTid, BoostFramework.PassPid.RENDER_TID);
+                }
+            }
+
             if (reportDebugMsgs) {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making top: " + app);
             }

@@ -97,6 +97,7 @@ import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.IntArray;
 import android.util.Pair;
+import android.util.BoostFramework;
 import android.util.Slog;
 import android.util.SparseArray;
 
@@ -712,6 +713,7 @@ public class CachedAppOptimizer {
                 mOnNativeBootFlagsChangedListener);
         mAm.mContext.getContentResolver().registerContentObserver(
                 CACHED_APP_FREEZER_ENABLED_URI, false, mSettingsObserver);
+        applyVendorAppCompactConfig();
         synchronized (mPhenotypeFlagLock) {
             updateUseCompaction();
             updateCompactionThrottles();
@@ -731,6 +733,38 @@ public class CachedAppOptimizer {
             updateZramWritebackDmabufMemThresholdKb();
         }
     }
+
+    // QTI_BEGIN: 2019-10-31: Core: Enable App Compaction for LOW_RAM Targets.
+    // Vendor (perfconfigstore.xml) app compaction tuning -> DeviceConfig keys.
+    private static final String[][] VENDOR_APPCOMPACT_KEYS = {
+        {"vendor.appcompact.enable_app_compact", KEY_USE_COMPACTION},
+        {"vendor.appcompact.compact_throttle_somesome", KEY_COMPACT_THROTTLE_1},
+        {"vendor.appcompact.compact_throttle_somefull", KEY_COMPACT_THROTTLE_2},
+        {"vendor.appcompact.compact_throttle_fullsome", KEY_COMPACT_THROTTLE_3},
+        {"vendor.appcompact.compact_throttle_fullfull", KEY_COMPACT_THROTTLE_4},
+        {"vendor.appcompact.compact_throttle_bfgs", KEY_COMPACT_THROTTLE_5},
+        {"vendor.appcompact.compact_throttle_persistent", KEY_COMPACT_THROTTLE_6},
+        {"vendor.appcompact.rss_throttle_kb", KEY_COMPACT_FULL_RSS_THROTTLE_KB},
+        {"vendor.appcompact.delta_rss_throttle_kb", KEY_COMPACT_FULL_DELTA_RSS_THROTTLE_KB},
+    };
+
+    private void applyVendorAppCompactConfig() {
+        try {
+            final BoostFramework perf = new BoostFramework();
+            for (String[] key : VENDOR_APPCOMPACT_KEYS) {
+                final String value = perf.perfGetProp(key[0], "");
+                if (value == null || value.isEmpty()) {
+                    continue;
+                }
+                DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, key[1], value,
+                        false /* makeDefault */);
+                Slog.i(TAG_AM, "appcompact: " + key[1] + "=" + value + " (" + key[0] + ")");
+            }
+        } catch (RuntimeException e) {
+            Slog.w(TAG_AM, "appcompact: failed to apply vendor config", e);
+        }
+    }
+    // QTI_END: 2019-10-31: Core: Enable App Compaction for LOW_RAM Targets.
 
     /**
      * Returns whether compaction is enabled.

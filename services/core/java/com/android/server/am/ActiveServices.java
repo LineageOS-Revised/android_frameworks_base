@@ -139,6 +139,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NA
 import static com.android.server.am.psc.Constants.INVALID_ADJ;
 import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
 import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_ADJ;
 
 import android.Manifest;
 import android.annotation.IntDef;
@@ -230,6 +231,9 @@ import android.stats.devicepolicy.DevicePolicyEnums;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+import android.util.BoostFramework;
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.EventLog;
 import android.util.Pair;
 import android.util.PrintWriterPrinter;
@@ -268,6 +272,9 @@ import com.android.server.am.psc.SyncBatchSession;
 import com.android.server.pm.KnownPackages;
 import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.uri.NeededUriGrants;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+import com.android.server.wm.ActivityRecord;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.server.utils.AnrTimer;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
@@ -426,6 +433,29 @@ public final class ActiveServices {
     // Maximum number of services that we allow to start in the background
     // at the same time.
     final int mMaxStartingBackground;
+
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+   //mPerf Object
+   public static BoostFramework mPerf = new BoostFramework();
+
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    // Flag to reschedule the services during app launch. Disable by default.
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+    private static boolean SERVICE_RESCHEDULE = false;
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+    private static final String SERVICETRACKER_AIDL_SERVICE =
+            "vendor.qti.hardware.servicetrackeraidl.IServicetracker/default";
+    private boolean mServicetrackerDeclared = false;
+    private vendor.qti.hardware.servicetrackeraidl.IServicetracker mServicetracker;
+    // Give up after a few failed lookups (e.g. sepolicy denies find) to avoid log/binder spam.
+    private int mServicetrackerLookupFailures = 0;
+    private static final int SERVICETRACKER_MAX_LOOKUP_FAILURES = 10;
+    private final boolean mIsLowRamDevice =
+            SystemProperties.getBoolean("ro.config.low_ram", false);
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 
     /**
      * Master service bookkeeping, keyed by user number.
@@ -816,6 +846,11 @@ public final class ActiveServices {
                 ? maxBg : ActivityManager.isLowRamDeviceStatic() ? 1 : 8;
 
         final IBinder b = ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE);
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+        if(mPerf != null)
+            SERVICE_RESCHEDULE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.am.reschedule_service", "false"));
+        Slog.i(TAG, "perf: reschedule_service=" + SERVICE_RESCHEDULE);
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
         mFGSLogger = new ForegroundServiceTypeLoggerModule();
         mActiveServiceAnrTimer =
                 new ProcessAnrTimer(
@@ -853,6 +888,15 @@ public final class ActiveServices {
     }
 
     void systemServicesReady() {
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+        try {
+            mServicetrackerDeclared = !mIsLowRamDevice
+                    && ServiceManager.isDeclared(SERVICETRACKER_AIDL_SERVICE);
+        } catch (Exception e) {
+            mServicetrackerDeclared = false;
+        }
+        Slog.i(TAG, "servicetracker: declared=" + mServicetrackerDeclared);
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         getAppStateTracker().addBackgroundRestrictedAppListener(new BackgroundRestrictedListener());
         mAppWidgetManagerInternal = LocalServices.getService(AppWidgetManagerInternal.class);
         setAllowListWhileInUsePermissionInFgs();
@@ -4196,6 +4240,105 @@ public final class ActiveServices {
         return false;
     }
 
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+    private vendor.qti.hardware.servicetrackeraidl.IServicetracker getServicetrackerLocked() {
+        if (!mServicetrackerDeclared) {
+            return null;
+        }
+        if (mServicetracker == null) {
+            if (mServicetrackerLookupFailures >= SERVICETRACKER_MAX_LOOKUP_FAILURES) {
+                return null;
+            }
+            // Never block the AMS lock waiting for the HAL; try again on the next event.
+            final IBinder b = ServiceManager.checkService(SERVICETRACKER_AIDL_SERVICE);
+            if (b != null) {
+                mServicetracker =
+                        vendor.qti.hardware.servicetrackeraidl.IServicetracker.Stub.asInterface(b);
+                mServicetrackerLookupFailures = 0;
+                Slog.i(TAG, "servicetracker: connected");
+            } else if (++mServicetrackerLookupFailures >= SERVICETRACKER_MAX_LOOKUP_FAILURES) {
+                Slog.w(TAG, "servicetracker: HAL not reachable (not running or sepolicy), "
+                        + "giving up");
+            }
+        }
+        return mServicetracker;
+    }
+
+    private static vendor.qti.hardware.servicetrackeraidl.ServiceData servicetrackerServiceData(
+            ServiceRecord r) {
+        final vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
+                new vendor.qti.hardware.servicetrackeraidl.ServiceData();
+        final ProcessRecord host = r.getHostProcess();
+        sData.packageName = r.packageName;
+        sData.processName = r.shortInstanceName;
+        sData.lastActivity = r.getLastActivity();
+        sData.pid = host != null ? host.getPid() : -1;
+        sData.serviceB = host != null && host.isServiceB();
+        return sData;
+    }
+
+    private static vendor.qti.hardware.servicetrackeraidl.ClientData servicetrackerClientData(
+            ProcessRecord app) {
+        final vendor.qti.hardware.servicetrackeraidl.ClientData cData =
+                new vendor.qti.hardware.servicetrackeraidl.ClientData();
+        cData.processName = app != null && app.processName != null ? app.processName : "";
+        cData.pid = app != null ? app.getPid() : -1;
+        return cData;
+    }
+
+    private static final int SERVICETRACKER_BIND = 0;
+    private static final int SERVICETRACKER_UNBIND = 1;
+    private static final int SERVICETRACKER_START = 2;
+    private static final int SERVICETRACKER_DESTROY = 3;
+
+    private void notifyServicetrackerLocked(int event, ServiceRecord r, ProcessRecord client) {
+        final vendor.qti.hardware.servicetrackeraidl.IServicetracker st =
+                getServicetrackerLocked();
+        if (st == null || r == null) {
+            return;
+        }
+        try {
+            final vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
+                    servicetrackerServiceData(r);
+            switch (event) {
+                case SERVICETRACKER_BIND:
+                    st.bindService(sData, servicetrackerClientData(client));
+                    break;
+                case SERVICETRACKER_UNBIND:
+                    st.unbindService(sData, servicetrackerClientData(client));
+                    break;
+                case SERVICETRACKER_START:
+                    st.startService(sData);
+                    break;
+                case SERVICETRACKER_DESTROY:
+                    st.destroyService(sData);
+                    break;
+            }
+            if (BoostFramework.isDebugEnabled()) {
+                Slog.d(TAG, "servicetracker: event=" + event + " svc=" + sData.processName
+                        + " pid=" + sData.pid + " client=" + (client != null ? client.processName : "-"));
+            }
+        } catch (RemoteException | RuntimeException e) {
+            Slog.e(TAG, "servicetracker: failed to send event " + event, e);
+            mServicetracker = null;
+        }
+    }
+
+    private void notifyServicetrackerKillLocked(int pid) {
+        final vendor.qti.hardware.servicetrackeraidl.IServicetracker st =
+                getServicetrackerLocked();
+        if (st == null) {
+            return;
+        }
+        try {
+            st.killProcess(pid);
+        } catch (RemoteException | RuntimeException e) {
+            Slog.e(TAG, "servicetracker: failed to send kill for pid " + pid, e);
+            mServicetracker = null;
+        }
+    }
+
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     int bindServiceLocked(IApplicationThread caller, IBinder token, Intent service,
             String resolvedType, final IServiceConnection connection, long flags,
             String instanceName, boolean isSdkSandboxService, int sdkSandboxClientAppUid,
@@ -4433,6 +4576,10 @@ public final class ActiveServices {
                 mServiceConnections.put(binder, clist);
             }
             clist.add(c);
+
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+            notifyServicetrackerLocked(SERVICETRACKER_BIND, s, callerApp);
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
 
             final boolean isolated = (s.serviceInfo.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0;
             final ProcessRecord hostApp = isolated
@@ -4728,6 +4875,10 @@ public final class ActiveServices {
         boolean needOomAdj = false;
         while (clist.size() > 0) {
             final ConnectionRecord r = clist.get(0);
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+            notifyServicetrackerLocked(SERVICETRACKER_UNBIND, r.binding.service,
+                    r.binding.client);
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             final int serviceBindingOomAdjPolicy = removeConnectionLocked(r, null, null, true);
             if (clist.size() > 0 && clist.get(0) == r) {
                 // In case it didn't get removed above, do it now.
@@ -6024,8 +6175,49 @@ public final class ActiveServices {
         }
         try (var unused = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_START_SERVICE)) {
-            bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
-                    false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            if(SERVICE_RESCHEDULE) {
+                boolean shouldDelay = false;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                boolean isVisible = false;
+                ActivityRecord top_rc = mAm.mTaskSupervisor.getTopResumedActivity();
+                ProcessRecord pRec = mAm.getProcessRecordLocked(r.serviceInfo.applicationInfo.processName,r.serviceInfo.applicationInfo.uid);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+
+                boolean isPersistent
+                        = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                if (pRec != null)
+                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  VISIBLE_APP_ADJ);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                if(top_rc != null) {
+                    if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        && !isPersistent && !r.isForeground() && !isVisible) {
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        shouldDelay = true;
+                    }
+                }
+                if(!shouldDelay) {
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                    bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
+                            false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                } else {
+                    if (DEBUG_DELAYED_SERVICE) {
+                        Slog.v(TAG, "Reschedule service restart due to app launch"
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                              +" r.shortInstanceName "+r.shortInstanceName+" r.app = "+r.getHostProcess());
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                    }
+                    r.resetRestartCounter();
+                    scheduleServiceRestartLocked(r, true);
+                }
+            } else {
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
+                        false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
+            }
         } catch (TransactionTooLargeException e) {
             // Ignore, it's been logged and nothing upstack cares.
         } finally {
@@ -6556,6 +6748,9 @@ public final class ActiveServices {
                         app.getReportedProcState());
                 r.postNotification(false);
                 created = true;
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+                notifyServicetrackerLocked(SERVICETRACKER_START, r, null);
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             } catch (DeadObjectException e) {
                 Slog.w(TAG, "Application dead when creating service " + r);
                 mAm.appDiedLocked(app, "Died when creating service");
@@ -6769,6 +6964,10 @@ public final class ActiveServices {
                 // importance. Mark the service host process as skippable for the session.
                 batch.skipProcDueToServiceBindPolicy(r.getHostProcess());
             }
+
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+            notifyServicetrackerLocked(SERVICETRACKER_DESTROY, r, null);
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
 
             if (r.isShortFgs()) {
                 // FGS can be stopped without the app calling stopService() or stopSelf(),
@@ -7825,6 +8024,9 @@ public final class ActiveServices {
 
         try (var unused = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_STOP_SERVICE)) {
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+            notifyServicetrackerKillLocked(app.getPid());
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             // Clean up any connections this application has to other services.
             for (int i = psr.numberOfConnections() - 1; i >= 0; i--) {
                 ConnectionRecord r = psr.getConnectionAt(i);

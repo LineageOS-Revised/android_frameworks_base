@@ -71,6 +71,14 @@ import android.view.Display;
 public class BoostFramework {
 
     private static final String TAG = "BoostFramework";
+    /** Set to true (setprop debug.qtiperf.log 1) to trace every call into the perf stack. */
+    private static final String DEBUG_PROP = "debug.qtiperf.log";
+    private static boolean sLoadReported = false;
+
+    /** @hide */
+    public static boolean isDebugEnabled() {
+        return SystemProperties.getBoolean(DEBUG_PROP, false);
+    }
     private static final String PERFORMANCE_JAR = "/system/framework/QPerformance.jar";
     private static final String PERFORMANCE_CLASS = "com.qualcomm.qti.Performance";
 
@@ -293,7 +301,7 @@ public class BoostFramework {
             }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
-        catch(Exception e) {
+        catch(Throwable e) {
             Log.e(TAG,"BoostFramework() : Exception_2 = " + e);
         }
     }
@@ -327,7 +335,7 @@ public class BoostFramework {
             }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
-        catch(Exception e) {
+        catch(Throwable e) {
             Log.e(TAG,"BoostFramework() : Exception_3 = " + e);
         }
     }
@@ -346,7 +354,7 @@ public class BoostFramework {
                 mUxPerf = sUxPerfClass.newInstance();
             }
         }
-        catch(Exception e) {
+        catch(Throwable e) {
             Log.e(TAG,"BoostFramework() : Exception_5 = " + e);
         }
     }
@@ -450,7 +458,7 @@ public class BoostFramework {
                     sIsLoaded = true;
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                 }
-                catch(Exception e) {
+                catch(Throwable e) {
                     Log.e(TAG,"BoostFramework() : Exception_1 = " + e);
                 }
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -469,11 +477,18 @@ public class BoostFramework {
 
                     sUxIsLoaded = true;
                 }
-                catch(Exception e) {
+                catch(Throwable e) {
                     Log.e(TAG,"BoostFramework() Ux Perf: Exception = " + e);
                 }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+            }
+            if (!sLoadReported && (ActivityThread.isSystem() || isDebugEnabled())) {
+                sLoadReported = true;
+                Log.i(TAG, "perf stack: QPerformance=" + (sIsLoaded ? "ok" : "MISSING")
+                        + " UxPerformance=" + (sUxIsLoaded ? "ok" : "MISSING")
+                        + " halVer=" + (sPerfGetPerfHalVerFunc != null ? "query" : "n/a")
+                        + " debug=" + isDebugEnabled());
             }
         }
     }
@@ -486,6 +501,10 @@ public class BoostFramework {
             if (sAcquireFunc != null) {
                 Object retVal = sAcquireFunc.invoke(mPerf, duration, list);
                 ret = (int)retVal;
+            }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfLockAcquire dur=" + duration + " args="
+                        + java.util.Arrays.toString(list) + " -> " + ret);
             }
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
@@ -503,6 +522,7 @@ public class BoostFramework {
                 Object retVal = sReleaseFunc.invoke(mPerf);
                 ret = (int)retVal;
             }
+            if (isDebugEnabled()) Log.d(TAG, "perfLockRelease -> " + ret);
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -537,6 +557,7 @@ public class BoostFramework {
                 Object retVal = sReleaseHandlerFunc.invoke(mPerf, handle);
                 ret = (int)retVal;
             }
+            if (isDebugEnabled()) Log.d(TAG, "perfLockReleaseHandler h=" + handle + " -> " + ret);
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -562,6 +583,11 @@ public class BoostFramework {
             if (sPerfHintFunc != null) {
                 Object retVal = sPerfHintFunc.invoke(mPerf, hint, userDataStr, userData1, userData2);
                 ret = (int)retVal;
+            }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfHint 0x" + Integer.toHexString(hint) + " pkg=" + userDataStr
+                        + " d1=" + userData1 + " d2=" + userData2 + " -> " + ret
+                        + (sPerfHintFunc == null ? " (QPerformance not loaded)" : ""));
             }
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
@@ -592,6 +618,10 @@ public class BoostFramework {
             if (sFeedbackFunc != null) {
                 Object retVal = sFeedbackFunc.invoke(mPerf, req, pkg_name);
                 ret = (int)retVal;
+            }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfGetFeedback 0x" + Integer.toHexString(req) + " pkg=" + pkg_name
+                        + " -> " + ret);
             }
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -726,6 +756,9 @@ public class BoostFramework {
             }else {
                 ret = def_val;
             }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfGetProp " + prop_name + " (def " + def_val + ") -> " + ret);
+            }
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
         }
@@ -757,6 +790,11 @@ public class BoostFramework {
             if (sPerfEventFunc != null) {
                 sPerfEventFunc.invoke(mPerf, eventId, pkg_name, numArgs, list);
             }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfEvent 0x" + Integer.toHexString(eventId) + " pkg=" + pkg_name
+                        + " args=" + java.util.Arrays.toString(list)
+                        + (sPerfEventFunc == null ? " (QPerformance not loaded)" : ""));
+            }
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
         }
@@ -786,6 +824,11 @@ public class BoostFramework {
                 Object retVal = sperfHintAcqRelFunc.invoke(mPerf,handle, hint, pkg_name,
                                                            duration, hintType, numArgs, list);
                 ret = (int)retVal;
+            }
+            if (isDebugEnabled()) {
+                Log.d(TAG, "perfHintAcqRel h=" + handle + " 0x" + Integer.toHexString(hint)
+                        + " pkg=" + pkg_name + " dur=" + duration + " type=" + hintType
+                        + " args=" + java.util.Arrays.toString(list) + " -> " + ret);
             }
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -894,9 +937,8 @@ public class BoostFramework {
                 argClasses = new Class[]{long.class};
                 sGetAdjustedAnimationClock = sQXPerfClass.getMethod(
                         "getAdjustedAnimationClock", argClasses);
-            } catch (Exception e) {
-                Log.e(TAG, "initQXPerfFuncs failed");
-                e.printStackTrace();
+            } catch (Throwable e) {
+                Log.e(TAG, "initQXPerfFuncs failed", e);
             } finally {
                 // If frameworks and perf changes don't match(may not built together)
                 // or other exception, need to set sQXIsLoaded as true to avoid retry.
@@ -926,7 +968,12 @@ public class BoostFramework {
                                 sSetFrameInterval.invoke(null, frameIntervalNanos);
                                 sScrollOptEnable = true;
                             }
-                        } catch (Exception e) {
+                            if (isDebugEnabled()) {
+                                Log.d(TAG, "ScrollOptimizer prop=" + sScrollOptProp
+                                        + " QXPerformance=" + (sQXPerfClass != null)
+                                        + " enabled=" + sScrollOptEnable);
+                            }
+                        } catch (Throwable e) {
                             Log.e(TAG, "Failed to run initThread.");
                             e.printStackTrace();
                         }

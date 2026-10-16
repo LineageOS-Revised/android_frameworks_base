@@ -89,6 +89,7 @@ import android.graphics.Rect;
 import android.os.IBinder;
 import android.os.UserHandle;
 import android.util.ArraySet;
+import android.util.BoostFramework;
 import android.util.DebugUtils;
 import android.util.DisplayMetrics;
 import android.util.Slog;
@@ -102,6 +103,7 @@ import android.window.TaskFragmentInfo;
 import android.window.TaskFragmentOrganizerToken;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.app.ActivityTrigger;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.server.am.HostingRecord;
@@ -200,6 +202,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     final ActivityTaskSupervisor mTaskSupervisor;
     final RootWindowContainer mRootWindowContainer;
     private final TaskFragmentOrganizerController mTaskFragmentOrganizerController;
+
+    public BoostFramework mPerf = null;
+    //ActivityTrigger
+    static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
 
     /**
      * @deprecated Use {@link #getMinWidth} instead.
@@ -1426,7 +1432,17 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
+        if (!next.translucentWindowLaunch)
+            next.launching = true;
+
         if (DEBUG_SWITCH) Slog.v(TAG_SWITCH, "Resuming " + next);
+
+        //Trigger Activity Resume
+        if (mActivityTrigger != null) {
+            mActivityTrigger.activityResumeTrigger(next.intent, next.info,
+                                                   next.info.applicationInfo,
+                                                   next.occludesParent());
+        }
 
         mTaskSupervisor.setLaunchSource(next.getUid());
 
@@ -1528,17 +1544,41 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         // to ignore it when computing the desired screen orientation.
         boolean anim = true;
         final DisplayContent dc = taskDisplayArea.mDisplayContent;
+
+        if (mPerf == null) {
+            mPerf = new BoostFramework();
+        }
+
         if (prev != null) {
             if (prev.finishing) {
                 if (mTaskSupervisor.mNoAnimActivities.contains(prev)) {
                     anim = false;
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST,
+                           next.packageName);
+                    }
                 }
                 prev.setVisibility(false);
-            } else if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
-                anim = false;
+            } else {
+                if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
+                    anim = false;
+                } else {
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST,
+                           next.packageName);
+                    }
+                }
             }
-        } else if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
-            anim = false;
+        } else {
+            if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
+                anim = false;
+// QTI_BEGIN: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
+                // Exit app animation boost
+                if (next != null && mPerf != null) {
+                    mPerf.perfHint(BoostFramework.VENDOR_HINT_EXIT_ANIM_BOOST, next.packageName);
+                }
+// QTI_END: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
+            }
         }
 
         if (anim) {
@@ -1799,6 +1839,20 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             Slog.wtf(TAG, "Trying to pause activity that is in process of being resumed");
             return false;
         }
+
+        //Trigger Activity Pause
+        if (mActivityTrigger != null) {
+            mActivityTrigger.activityPauseTrigger(pausing.intent, pausing.info,
+                                                  pausing.info.applicationInfo);
+        }
+
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
+        if (mAtmService.getToastWindow() == true) {
+            // When we have a toast window, that activity will be translucent.
+            pausing.translucentWindowLaunch = true;
+            mAtmService.resetToastWindow();
+        }
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 
         ProtoLog.v(WM_DEBUG_STATES, "Moving to PAUSING: %s", pausing);
         mPausingActivity = pausing;

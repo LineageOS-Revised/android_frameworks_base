@@ -293,6 +293,9 @@ import android.os.UserHandle;
 import android.service.contentcapture.ActivityEvent;
 import android.service.dreams.DreamActivity;
 import android.service.voice.IVoiceInteractionSession;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.EventLog;
 import android.util.Log;
 import android.util.MergedConfiguration;
@@ -369,7 +372,7 @@ import java.util.function.Predicate;
 /**
  * An entry in the history task, representing an activity.
  */
-final class ActivityRecord extends WindowToken {
+public final class ActivityRecord extends WindowToken {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityRecord" : TAG_ATM;
     private static final String TAG_ADD_REMOVE = TAG + POSTFIX_ADD_REMOVE;
     private static final String TAG_APP = TAG + POSTFIX_APP;
@@ -429,7 +432,7 @@ final class ActivityRecord extends WindowToken {
     final int mUserId;
     // The package implementing intent's component
     // TODO: rename to mPackageName
-    final String packageName;
+    public final String packageName;
     // the intent component, or target of an alias.
     final ComponentName mActivityComponent;
     // Input application handle used by the input dispatcher.
@@ -460,6 +463,10 @@ final class ActivityRecord extends WindowToken {
     final boolean rootVoiceInteraction;  // was this the root activity of a voice interaction?
 
     private final int theme;        // resource identifier of activity's theme.
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public int perfActivityBoostHandler = -1; //perflock handler when activity is created.
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    private int mPerfScenarioBoostHandler = -1;
     private Task task;              // the task this is in.
     private long createTime = System.currentTimeMillis();
     long lastVisibleTime;         // last time this activity became visible
@@ -517,6 +524,10 @@ final class ActivityRecord extends WindowToken {
     // True if the visible state of this token was forced to true due to a transferred starting
     // window.
     private boolean mVisibleSetFromTransferredStartingWindow;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public boolean launching;      // is activity launch in progress?
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public boolean translucentWindowLaunch; // a translucent window launch?
     boolean nowVisible;     // is this activity's window visible?
     boolean idle;           // has the activity gone idle?
     boolean hasBeenLaunched;// has this activity ever been launched?
@@ -607,6 +618,11 @@ final class ActivityRecord extends WindowToken {
     boolean pendingVoiceInteractionStart;   // Waiting for activity-invoked voice session
     IVoiceInteractionSession voiceSession;  // Voice interaction session for this activity
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public BoostFramework mPerf = null;
+    public BoostFramework mPerf_iop = null;
+
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     boolean mVoiceInteraction;
 
     int mPostponedRelaunchConfigChangesFlags;
@@ -1441,6 +1457,14 @@ final class ActivityRecord extends WindowToken {
             } else {
                 mLastReportedMultiWindowMode = inMultiWindowMode;
                 ensureActivityConfiguration();
+                if (mPerf != null) {
+                    int mode = BoostFramework.ActivityWindowMode.STANDARD;
+                    if (inMultiWindowMode) {
+                        mode = BoostFramework.ActivityWindowMode.MULTI_WINDOW;
+                    }
+                    mPerf.perfEvent(BoostFramework.VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE,
+                                    packageName, 1, mode);
+                }
             }
         }
     }
@@ -1471,6 +1495,14 @@ final class ActivityRecord extends WindowToken {
                 // result a non-touchable PiP window since the InputConsumer for PiP requires it.
                 EventLog.writeEvent(0x534e4554, "265293293", -1, "");
                 removeImmediately();
+            }
+            if (inPictureInPictureMode != mLastReportedPictureInPictureMode && mPerf != null) {
+                int mode = BoostFramework.ActivityWindowMode.STANDARD;
+                if (inPictureInPictureMode) {
+                    mode = BoostFramework.ActivityWindowMode.PIP;
+                }
+                mPerf.perfEvent(BoostFramework.VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE,
+                                packageName, 1, mode);
             }
         }
     }
@@ -1989,6 +2021,8 @@ final class ActivityRecord extends WindowToken {
         super.setClientVisible(true);
         idle = false;
         hasBeenLaunched = false;
+        launching = false;
+        translucentWindowLaunch = false;
         mTaskSupervisor = supervisor;
 
         info.taskAffinity = computeTaskAffinity(info.taskAffinity, info.getUid());
@@ -2074,6 +2108,11 @@ final class ActivityRecord extends WindowToken {
 
         mAppActivityEmbeddingSplitsEnabled = isAppActivityEmbeddingSplitsEnabled();
         mAllowUntrustedEmbeddingStateSharing = getAllowUntrustedEmbeddingStateSharingProperty();
+
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+        if (mPerf == null)
+            mPerf = new BoostFramework();
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
         mOptInOnBackInvoked = WindowOnBackInvokedDispatcher
                 .isOnBackInvokedCallbackEnabled(info, info.applicationInfo,
@@ -2281,6 +2320,7 @@ final class ActivityRecord extends WindowToken {
                 windowDisableStarting);
         // If this activity is launched from system surface, ignore windowDisableStarting
         if (windowIsTranslucent || windowIsFloating) {
+            translucentWindowLaunch = true;
             return false;
         }
         if (windowShowWallpaper
@@ -6130,6 +6170,7 @@ final class ActivityRecord extends WindowToken {
                 Slog.v(TAG_VISIBILITY, "Start visible activity, " + this);
             }
             setState(STARTED, "makeActiveIfNeeded");
+            acquireActivityBoost();
 
             final StartActivityItem item = new StartActivityItem(token, takeSceneTransitionInfo());
             mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
@@ -6645,8 +6686,61 @@ final class ActivityRecord extends WindowToken {
         }
     }
 
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+    protected void releaseActivityBoost() {
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+        if (mPerf != null && perfActivityBoostHandler > 0) {
+            mPerf.perfLockReleaseHandler(perfActivityBoostHandler);
+            perfActivityBoostHandler = -1;
+        } else if (perfActivityBoostHandler > 0) {
+            Slog.w(TAG, "activity boost didn't release as expected");
+        }
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+    }
+
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+    protected void acquireActivityBoost() {
+        if (mPerf != null) {
+            if (mPerf.shouldUseUiPerf(mWmService.mContext, packageName)) {
+                return;
+            }
+            if (mPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
+                int pkgType = mPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
+                        packageName);
+                int pid = -1;
+                WindowProcessController wpc = null;
+                if (app == null) {
+                    if (info != null && info.applicationInfo != null && mAtmService != null) {
+                        wpc = mAtmService.getProcessController(processName,
+                                info.applicationInfo.uid);
+                    }
+                } else {
+                    wpc = app;
+                }
+                if (wpc != null && wpc.hasThread()) {
+                    pid = wpc.getPid();
+                }
+                perfActivityBoostHandler =
+                        mPerf.perfHintAcqRel(perfActivityBoostHandler,
+                                BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName,
+                                -1, BoostFramework.Launch.ACTIVITY_LAUNCH_BOOST, 2, pkgType, pid);
+            } else {
+                if (perfActivityBoostHandler > 0) {
+                    Slog.i(TAG, "Activity boosted, release it firstly");
+                    mPerf.perfLockReleaseHandler(perfActivityBoostHandler);
+                }
+                perfActivityBoostHandler =
+                         mPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                                 packageName, -1, BoostFramework.Launch.BOOST_V1);
+            }
+        }
+    }
+
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
     /** Called when the windows associated app window container are drawn. */
     private void onWindowsDrawn() {
+        releaseActivityBoost();
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
         final TransitionInfoSnapshot info = mTaskSupervisor
                 .getActivityMetricsLogger().notifyWindowsDrawn(this);
         final boolean validInfo = info != null;
@@ -6670,11 +6764,28 @@ final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
+        if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)
+                          && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
+            mPerf.handleUiPerfFullTest(mWmService.mContext, info.name);
+            int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
+            if (hint != -1) {
+                int timeout_ms = 5 * 60 * 1000;
+                mPerfScenarioBoostHandler = mPerf.perfHintAcqRel(mPerfScenarioBoostHandler,
+                         hint, "android", timeout_ms);
+                mPerf.pickDisplayRefreshRate(mWmService.mContext, info.name);
+            } else {
+                mPerf.displayRefreshRateRestore(mWmService.mContext);
+            }
+        } else if (mPerf != null && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
+            mPerf.displayRefreshRateRestore(mWmService.mContext);
+        }
+
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting visible in " + token);
         mTaskSupervisor.stopWaitingForActivityVisible(this);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsVisibleLocked(): " + this);
         if (!nowVisible) {
             nowVisible = true;
+            launching = false;
             lastVisibleTime = SystemClock.uptimeMillis();
             mAtmService.scheduleAppGcsLocked();
             // The nowVisible may be false in onAnimationFinished because the transition animation
@@ -6688,9 +6799,14 @@ final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are no longer visible. */
     void onWindowsGone() {
+        if (mPerfScenarioBoostHandler != -1 && mPerf != null) {
+            mPerf.perfLockReleaseHandler(mPerfScenarioBoostHandler);
+            mPerfScenarioBoostHandler = -1;
+        }
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting gone in " + token);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsGone(): " + this);
         nowVisible = false;
+        launching = false;
     }
 
     void updateReportedVisibilityLocked() {
@@ -7291,6 +7407,19 @@ final class ActivityRecord extends WindowToken {
         return candidate;
     }
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public int isAppInfoGame() {
+        int isGame = 0;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+        if (info.applicationInfo != null) {
+            isGame = (info.applicationInfo.category == ApplicationInfo.CATEGORY_GAME ||
+                      (info.applicationInfo.flags & ApplicationInfo.FLAG_IS_GAME) == ApplicationInfo.FLAG_IS_GAME) ? 1 : 0;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+        }
+        return isGame;
+    }
+
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     boolean isTransitionForward() {
         return (mStartingData != null && mStartingData.mIsTransitionForward)
                 || mDisplayContent.isNextTransitionForward();

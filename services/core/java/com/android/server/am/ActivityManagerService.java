@@ -454,6 +454,9 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.view.autofill.AutofillManagerInternal;
 
 import com.android.internal.annotations.CompositeRWLock;
@@ -467,6 +470,9 @@ import com.android.internal.app.ProcessMap;
 import com.android.internal.app.SystemUserHomeActivity;
 import com.android.internal.app.procstats.ProcessState;
 import com.android.internal.app.procstats.ProcessStats;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+import com.android.internal.app.ActivityTrigger;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
@@ -553,6 +559,10 @@ import com.android.server.wm.ActivityMetricsLaunchObserver;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService;
+import com.android.server.wm.ActivityTaskSupervisor;
+// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
+import com.android.server.ActivityTriggerService;
+// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
 import com.android.server.wm.WindowManagerInternal;
 import com.android.server.wm.WindowManagerService;
 import com.android.server.wm.WindowProcessController;
@@ -581,6 +591,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -733,6 +744,14 @@ public class ActivityManagerService extends IActivityManager.Stub
     private static final int MAX_BUGREPORT_TITLE_SIZE = 100;
     private static final int MAX_BUGREPORT_DESCRIPTION_SIZE = 150;
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    /* Freq Aggr boost objects */
+    public static BoostFramework mPerfServiceStartHint = null;
+    /* UX perf event object */
+    public static BoostFramework mUxPerf = new BoostFramework();
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    public static boolean mForceStopKill = false;
+
     private static final DateTimeFormatter DROPBOX_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
 
@@ -765,6 +784,11 @@ public class ActivityManagerService extends IActivityManager.Stub
     SystemServiceManager mSystemServiceManager;
 
     private Installer mInstaller;
+
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    /** Run all ActivityStacks through this */
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    ActivityTaskSupervisor mTaskSupervisor;
 
     final InstrumentationReporter mInstrumentationReporter = new InstrumentationReporter();
 
@@ -1146,6 +1170,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                 sActiveProcessInfoSelfLocked.remove(pid);
             }
         }
+        ActivityTriggerService atService = LocalServices.getService(ActivityTriggerService.class);
+        if(atService != null) {
+            atService.updateRecord(app.getHostingRecord(), app.info, app.getPid(), ActivityTriggerService.PROC_ADDED_NOTIFICATION);
+        }
         mAtmInternal.onProcessMapped(pid, app.getWindowProcessController());
     }
 
@@ -1163,6 +1191,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
                 sActiveProcessInfoSelfLocked.remove(pid);
+            }
+            ActivityTriggerService atService = LocalServices.getService(ActivityTriggerService.class);
+            if(atService != null) {
+                atService.updateRecord(app.getHostingRecord(), app.info, app.getPid(), ActivityTriggerService.PROC_REMOVED_NOTIFICATION);
             }
             mAtmInternal.onProcessUnMapped(pid);
         }
@@ -2725,6 +2757,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mActivityTaskManager = atm;
         mActivityTaskManager.initialize(mIntentFirewall, mPendingIntentController,
                 mProcessStateController, activityTaskLooper);
+        mTaskSupervisor = mActivityTaskManager.mTaskSupervisor;
         mHiddenApiBlacklist = new HiddenApiSettings(mHandler, mContext);
 
         Watchdog.getInstance().addMonitor(this);
@@ -3870,6 +3903,57 @@ public class ActivityManagerService extends IActivityManager.Stub
         return mActivityTaskManager.startActivityFromRecents(taskId, bOptions);
     }
 
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+    public int startActivityAsUserEmpty(Bundle options) {
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+        ArrayList<String> pApps = options.getStringArrayList("start_empty_apps");
+        if (pApps != null && pApps.size() > 0) {
+            Iterator<String> apps_itr = pApps.iterator();
+            while (apps_itr.hasNext()) {
+                ProcessRecord empty_app = null;
+                String app_str = apps_itr.next();
+                if (app_str == null)
+                    continue;
+                synchronized (this) {
+                    Intent intent_l = null;
+                    try {
+                        intent_l = mContext.getPackageManager().getLaunchIntentForPackage(app_str);
+                        if (intent_l == null)
+                            continue;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        ActivityInfo aInfo = mTaskSupervisor.resolveActivity(intent_l, null,
+                                                                          0, null, 0, 0, Binder.getCallingPid());
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        if (aInfo == null)
+                            continue;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        empty_app = startProcessLocked(
+                            app_str,
+                            aInfo.applicationInfo,
+                            false /* knownToBeDead */,
+                            0 /* intentFlags */,
+                           sNullHostingRecord /* hostingRecord */,
+                           ZYGOTE_POLICY_FLAG_EMPTY /* zygotePolicyFlags */,
+                           false /* allowWhileBooting */,
+                           false /* isolated */);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                        if (empty_app != null)
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                            updateOomAdjLocked(empty_app, OOM_ADJ_REASON_SYSTEM_INIT);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+                    } catch (Exception e) {
+                        if (DEBUG_PROCESSES)
+                            Slog.w(TAG, "Exception raised trying to start app as empty " + e);
+                    }
+                }
+            }
+        }
+        return 1;
+    }
+
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+
     /**
      * This is the internal entry point for handling Activity.finish().
      *
@@ -4099,6 +4183,18 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
 
             traceBinderDiedEvent(app.processName, app.info.uid, pid);
+            if (mUxPerf != null && !mForceStopKill && !app.mErrorState.isNotResponding() && !app.mErrorState.isCrashing()) {
+                if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
+                    mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
+                    mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, app.processName, 0);
+                }
+                mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            } else if (mUxPerf != null) {
+                mUxPerf.perfEvent(BoostFramework.VENDOR_EVENT_KILL_ABNORMAL, app.processName, 2, 0, pid);
+            }
+
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
             EventLogTags.writeAmProcDied(app.userId, pid, app.processName, setAdj,
                     setProcState);
@@ -5306,6 +5402,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                     .emit();
         }
 
+        if (mUxPerf != null && app.getHostingRecord() != null && app.getHostingRecord().isTopApp()) {
+            if (mUxPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
+                int pkgType = mUxPerf.perfGetFeedback(
+                                    BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE, app.processName);
+                mUxPerf.perfHintAcqRel(-1,
+                    BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
+                    pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION, 1, pkgType);
+            } else {
+                mUxPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
+                    pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
+            }
+        }
+
         synchronized (mProcLock) {
             mProcessStateController.setAttachingProcessStatesLSP(app);
             clearProcessForegroundLocked(app);
@@ -6001,6 +6110,16 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 String data, Bundle extras, boolean ordered,
                                 boolean sticky, int sendingUser) {
                             mBootCompletedTimestamp = SystemClock.uptimeMillis();
+// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
+                            // Defer the compaction as system is currently busy
+                            mHandler.postDelayed(() -> {
+                                synchronized (mProcLock) {
+                                    if (!disableSystemCompaction()) {
+                                        mCachedAppOptimizer.compactAllSystem();
+                                    }
+                                }
+                            }, ActivityManagerConstants.COMPACTION_DELAY_MS);
+// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             // Defer the full Pss collection as the system is really busy now.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
@@ -14419,6 +14538,28 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             app.setPid(0);
         }
+
+        // Call Preferred App
+        if (app != null) {
+            ArrayList<ApplicationExitInfo> results = new ArrayList<ApplicationExitInfo>();
+            mProcessList.mAppExitInfoTracker.getExitInfo(
+                    app.processName, app.uid, app.getPid(), 0, results);
+            if (results != null) {
+                boolean recentAppClose = false;
+                for (int i=0; i<results.size();i++) {
+                    ApplicationExitInfo appExitInfo = results.get(i);
+                    if ((appExitInfo.getReason() == ApplicationExitInfo.REASON_USER_REQUESTED
+                            || appExitInfo.getReason() == ApplicationExitInfo.REASON_USER_STOPPED)
+                                && appExitInfo.getDescription() == "remove task") {
+                        recentAppClose = true;
+                        break;
+                    }
+                }
+                if (recentAppClose) {
+                    mTaskSupervisor.startPreferredApps();
+                }
+            }
+        }
         return false;
     }
 
@@ -17735,6 +17876,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+        @Override
+        public int startActivityAsUserEmpty(Bundle options) {
+            return ActivityManagerService.this.startActivityAsUserEmpty(options);
+        }
+
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public void onUserRemoved(int userId) {
             // Clean up UserController state

@@ -61,6 +61,9 @@ import android.util.EventLog;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
@@ -1409,6 +1412,30 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     mKillTime = SystemClock.uptimeMillis();
                 }
             }
+            if (mService.mUxPerf != null && !mService.mForceStopKill
+                && !mErrorState.isNotResponding() && !mErrorState.isCrashing()) {
+                if (mService.mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
+                    mService.mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
+                    mService.mUxPerf.perfUXEngine_events(
+                        BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
+                }
+                mService.mUxPerf.perfEvent(
+                    BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
+            } else {
+                if (mService.mUxPerf != null) {
+                    mService.mUxPerf.perfEvent(
+                        BoostFramework.VENDOR_EVENT_KILL_ABNORMAL,this.processName, 2, 0,getPid());
+                }
+                mService.mForceStopKill = false;
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            }
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            if (mService.mUxPerf != null && processName.equals(info.packageName)) {
+                mService.mUxPerf.perfHint(
+                    BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
+            }
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }
@@ -1828,6 +1855,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
             if (packageName != null) {
                 addPackage(packageName, versionCode, mService.mProcessStats);
+                if (mService.mUxPerf != null && processName.equals(packageName)) {
+                    mService.mUxPerf.perfHint(
+                            BoostFramework.VENDOR_HINT_PIN_FILE, packageName, 0, 0);
+                }
             }
 
             // Update oom adj first, we don't want the additional states are involved in this round.
