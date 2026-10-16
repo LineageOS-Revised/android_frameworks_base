@@ -156,6 +156,7 @@ import android.os.Handler;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.ArraySet;
+import android.util.BoostFramework;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
 import android.util.proto.ProtoOutputStream;
@@ -359,6 +360,13 @@ public abstract class OomAdjuster {
     protected final Constants mOomConstants;
     final @NonNull GlobalState mGlobalState;
     final ProcessListInternal mProcessList;
+
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+    // Enable hooks for background apps transition
+    boolean mEnableBgt = false;
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+
+    public static BoostFramework mPerf = new BoostFramework();
 
     private final int mNumSlots;
     protected final ArrayList<ProcessRecordInternal> mTmpProcessList = new ArrayList<>();
@@ -810,6 +818,12 @@ public abstract class OomAdjuster {
         mHostingTypeProvider = hostingTypeProvider;
 
         mLogger = new OomAdjusterDebugLogger(this, mOomConstants);
+        if(mPerf != null) {
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+            mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
+            Slog.i(TAG, "perf: bgt hooks=" + mEnableBgt);
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+        }
 
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
             final int group = msg.what;
@@ -2315,6 +2329,45 @@ public abstract class OomAdjuster {
 
         if (state.getCurAdj() != state.getSetAdj()) {
             mCallback.onOomAdjustChanged(state.getSetAdj(), state.getCurAdj(), state);
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+            // Hooks for background apps transition
+            if (mEnableBgt) {
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                if ((state.getSetAdj() >= CACHED_APP_MIN_ADJ &&
+                        state.getSetAdj() <= CACHED_APP_MAX_ADJ) &&
+                        state.getCurAdj() == FOREGROUND_APP_ADJ &&
+                            state.getHasForegroundActivities()) {
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                    Slog.d(TAG,"App adj change from cached state to fg state : "
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                            + state.getPid() + " " + state.processName);
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                    if (mPerf != null) {
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                        int fgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_FG, state.getPid()};
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                        mPerf.perfLockAcquire(10, fgAppPerfLockArgs);
+                    }
+                }
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                if(state.getSetAdj() == PREVIOUS_APP_ADJ &&
+                        (state.getCurAdj() >= CACHED_APP_MIN_ADJ &&
+                        state.getCurAdj() <= CACHED_APP_MAX_ADJ) &&
+                            state.getHasActivities()) {
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                    Slog.d(TAG,"App adj change from previous state to cached state : "
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                            + state.getPid() + " " + state.processName);
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                    if (mPerf != null) {
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+                        int bgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_BG, state.getPid()};
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+                        mPerf.perfLockAcquire(10, bgAppPerfLockArgs);
+                    }
+                }
+            }
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
             if (isBatchingOomAdj && mOomConstants.mEnableBatchingOomAdj) {
                 mProcsToOomAdj.add(state);
             } else {

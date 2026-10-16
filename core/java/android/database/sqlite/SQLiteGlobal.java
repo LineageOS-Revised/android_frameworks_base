@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 
 package android.database.sqlite;
 
@@ -20,6 +25,8 @@ import android.annotation.TestApi;
 import android.content.res.Resources;
 import android.os.StatFs;
 import android.os.SystemProperties;
+
+import android.util.BoostFramework;
 
 /**
  * Provides access to SQLite functions that affect all database connection,
@@ -54,6 +61,9 @@ public final class SQLiteGlobal {
     /** @hide */
     public static volatile String sDefaultSyncMode;
 
+    private static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
+    private static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
+
     private SQLiteGlobal() {
     }
 
@@ -85,6 +95,9 @@ public final class SQLiteGlobal {
      * Gets the default journal mode when WAL is not in use.
      */
     public static @SQLiteDatabase.JournalMode String getDefaultJournalMode() {
+        if (BoostFramework.shouldUseUiPerf()) {
+            return SystemProperties.get("debug.sqlite.journalmode", "PERSIST");
+        }
         return SystemProperties.get("debug.sqlite.journalmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_journal_mode));
@@ -107,6 +120,9 @@ public final class SQLiteGlobal {
         String defaultMode = sDefaultSyncMode;
         if (defaultMode != null) {
             return defaultMode;
+        }
+        if (BoostFramework.shouldUseUiPerf()) {
+            return SystemProperties.get("debug.sqlite.syncmode", "OFF");
         }
         return SystemProperties.get("debug.sqlite.syncmode",
                 Resources.getSystem().getString(

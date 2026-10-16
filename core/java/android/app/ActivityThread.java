@@ -200,6 +200,9 @@ import android.telephony.TelephonyFrameworkInitializer;
 import android.util.AndroidRuntimeException;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+import android.util.BoostFramework;
+// QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
@@ -7972,6 +7975,10 @@ public final class ActivityThread extends ClientTransactionHandler
     @UnsupportedAppUsage
     @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")
     private void handleBindApplication(AppBindData data) {
+// QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+        long st_bindApp = SystemClock.uptimeMillis();
+        BoostFramework ux_perf = null;
+// QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         mDdmSyncStageUpdater.next(Stage.Bind);
 
         // Register the UI Thread as a sensitive thread to the runtime.
@@ -8194,6 +8201,21 @@ public final class ActivityThread extends ClientTransactionHandler
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
 
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+        if (!Process.isIsolated()) {
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+            final int old_mask = StrictMode.allowThreadDiskWritesMask();
+            try {
+// QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+                ux_perf = new BoostFramework(appContext);
+// QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+            } finally {
+                 StrictMode.setThreadPolicyMask(old_mask);
+            }
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+        }
+
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         if (!Process.isIsolated()) {
             final int oldMask = StrictMode.allowThreadDiskWritesMask();
             try {
@@ -8355,6 +8377,38 @@ public final class ActivityThread extends ClientTransactionHandler
                 throw e.rethrowFromSystemServer();
             }
         }
+
+// QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+        long end_bindApp = SystemClock.uptimeMillis();
+        int bindApp_dur = (int) (end_bindApp - st_bindApp);
+        String pkg_name = null;
+        if (appContext != null) {
+            pkg_name = appContext.getPackageName();
+        }
+        if (ux_perf != null && !Process.isIsolated() && pkg_name != null) {
+// QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+            String pkgDir = null;
+            try
+            {
+                String codePath = appContext.getPackageCodePath();
+                pkgDir =  codePath.substring(0, codePath.lastIndexOf('/'));
+            }
+            catch(Exception e)
+            {
+                Slog.e(TAG, "HeavyGameThread () : Exception_1 = " + e);
+            }
+            if (ux_perf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
+                ux_perf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
+                ux_perf.perfUXEngine_events(BoostFramework.UXE_EVENT_BINDAPP, 0,
+                                               pkg_name,
+                                               bindApp_dur,
+                                               pkgDir);
+            } else {
+                ux_perf.perfEvent(BoostFramework.VENDOR_HINT_BINDAPP, pkg_name, 2, bindApp_dur, 0);
+            }
+// QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+        }
+// QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
         try {
             mgr.finishAttachApplication(mStartSeq, timestampApplicationOnCreateNs);

@@ -36,6 +36,9 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+import android.util.BoostFramework.ScrollOptimizer;
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodReplace;
 import android.util.Log;
@@ -377,6 +380,9 @@ public final class Choreographer {
         mLastFrameTimeNanos = Long.MIN_VALUE;
 
         mFrameIntervalNanos = (long)(1000000000 / getRefreshRate());
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+        ScrollOptimizer.setFrameInterval(mFrameIntervalNanos);
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
 
         mCallbackQueues = new CallbackQueue[CALLBACK_LAST + 1];
         for (int i = 0; i <= CALLBACK_LAST; i++) {
@@ -919,7 +925,9 @@ public final class Choreographer {
     private void scheduleFrameLocked(long now) {
         if (!mFrameScheduled) {
             mFrameScheduled = true;
-            if (USE_VSYNC) {
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+            if (ScrollOptimizer.shouldUseVsync(USE_VSYNC)) {
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
                 if (DEBUG_FRAMES) {
                     Log.d(TAG, "Scheduling next frame on vsync.");
                 }
@@ -935,6 +943,10 @@ public final class Choreographer {
                     mHandler.sendMessageAtFrontOfQueue(msg);
                 }
             } else {
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+                sFrameDelay = ScrollOptimizer.getFrameDelay(sFrameDelay,
+                        mLastFrameTimeNanos);
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
                 final long nextFrameTime = Math.max(
                         mLastFrameTimeNanos / TimeUtils.NANOS_PER_MS + sFrameDelay, now);
                 if (DEBUG_FRAMES) {
@@ -1190,6 +1202,14 @@ public final class Choreographer {
                 mLastVsyncEventData.copyFrom(vsyncEventData);
             }
 
+            if (frameIntervalNanos > 0 && (Math.abs(frameIntervalNanos - mFrameIntervalNanos)
+                    > TimeUtils.NANOS_PER_MS)) {
+                mFrameIntervalNanos = frameIntervalNanos;
+                ScrollOptimizer.setFrameInterval(mFrameIntervalNanos);
+            }
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+            ScrollOptimizer.setUITaskStatus(true);
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
             if (resynced && Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
                 String message = String.format("Choreographer#doFrame - resynced to %d in %.1fms",
                         timeline.mVsyncId, (timeline.mDeadlineNanos - startNanos) * 0.000001f);
@@ -1209,6 +1229,9 @@ public final class Choreographer {
             doCallbacks(Choreographer.CALLBACK_TRAVERSAL);
 
             doCallbacks(Choreographer.CALLBACK_COMMIT);
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+            ScrollOptimizer.setUITaskStatus(false);
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
         } finally {
             AnimationUtils.unlockAnimationClock();
             mInDoFrameCallback = false;
@@ -1626,6 +1649,7 @@ public final class Choreographer {
                 mTimestampNanos = timestampNanos;
                 mFrame = frame;
                 mLastVsyncEventData.copyFrom(vsyncEventData);
+                ScrollOptimizer.setVsyncTime(mTimestampNanos);
                 Message msg = Message.obtain(mHandler, this);
                 msg.setAsynchronous(true);
                 mHandler.sendMessageAtTime(msg, timestampNanos / TimeUtils.NANOS_PER_MS);

@@ -181,6 +181,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.Xml;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+import android.util.BoostFramework;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.view.Display;
 
 import com.android.internal.R;
@@ -4652,6 +4655,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }, overlayFilter);
 
         mModuleInfoProvider.systemReady();
+// QTI_BEGIN: 2020-04-03: Core: Add support for UxPerformance to receive context information.
+        new BoostFramework(mContext, true);
+// QTI_END: 2020-04-03: Core: Add support for UxPerformance to receive context information.
 
         // Installer service might attempt to install some packages that have been staged for
         // installation on reboot. Make sure this is the last component to be call since the

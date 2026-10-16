@@ -21,10 +21,14 @@ import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.hardware.SensorManager;
 import android.os.Build;
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+import android.util.BoostFramework.ScrollOptimizer;
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
 import android.util.Log;
 import android.view.ViewConfiguration;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
+import android.os.SystemProperties;
 
 /**
  * This class encapsulates scrolling with the ability to overshoot the bounds
@@ -163,6 +167,13 @@ public class OverScroller {
      */
     public final void forceFinished(boolean finished) {
         mScrollerX.mFinished = mScrollerY.mFinished = finished;
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+        if (finished && mMode == FLING_MODE) {
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+            ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
+        }
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
     }
 
     /**
@@ -287,6 +298,11 @@ public class OverScroller {
      */
     public boolean computeScrollOffset() {
         if (isFinished()) {
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+            if (mMode == FLING_MODE) {
+                ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
+            }
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
             return false;
         }
 
@@ -326,6 +342,11 @@ public class OverScroller {
                     }
                 }
 
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+                if (isFinished()) {
+                    ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
+                }
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
                 break;
         }
 
@@ -364,6 +385,9 @@ public class OverScroller {
      * @param duration Duration of the scroll in milliseconds.
      */
     public void startScroll(int startX, int startY, int dx, int dy, int duration) {
+// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
+        ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
+// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
         mMode = SCROLL_MODE;
         mScrollerX.startScroll(startX, dx, duration);
         mScrollerY.startScroll(startY, dy, duration);
@@ -435,6 +459,10 @@ public class OverScroller {
             }
         }
 
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+        ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_START);
+
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
         mMode = FLING_MODE;
         mScrollerX.fling(startX, velocityX, minX, maxX, overX);
         mScrollerY.fling(startY, velocityY, minY, maxY, overY);
@@ -502,6 +530,11 @@ public class OverScroller {
      * @see #forceFinished(boolean)
      */
     public void abortAnimation() {
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+        if (mMode == FLING_MODE) {
+            ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
+        }
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
         mScrollerX.finish();
         mScrollerY.finish();
     }
@@ -536,6 +569,9 @@ public class OverScroller {
 
     static class SplineOverScroller {
         // Initial position
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+        private Context mContext;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         private int mStart;
 
         // Current position
@@ -637,6 +673,9 @@ public class OverScroller {
         }
 
         SplineOverScroller(Context context) {
+// QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+            mContext = context;
+// QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             mFinished = true;
             final float ppi = context.getResources().getDisplayMetrics().density * 160.0f;
             mPhysicalCoeff = SensorManager.GRAVITY_EARTH // g (m/s^2)
@@ -845,7 +884,7 @@ public class OverScroller {
         }
 
         void notifyEdgeReached(int start, int end, int over) {
-            // mState is used to detect successive notifications 
+            // mState is used to detect successive notifications
             if (mState == SPLINE) {
                 mOver = over;
                 mStartTime = AnimationUtils.currentAnimationTimeMillis();
@@ -910,9 +949,12 @@ public class OverScroller {
          */
         boolean update() {
             final long time = AnimationUtils.currentAnimationTimeMillis();
-            final long currentTime = time - mStartTime;
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+            final long adjustedTime = ScrollOptimizer.getAdjustedAnimationClock(time);
+            final long currentTime = adjustedTime - mStartTime;
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 
-            if (currentTime == 0) {
+            if (currentTime <= 0) {
                 // Skip work but report that we're still going if we have a nonzero duration.
                 return mDuration > 0;
             }
@@ -952,8 +994,8 @@ public class OverScroller {
                     final float t = (float) (currentTime) / mDuration;
                     final float t2 = t * t;
                     final float sign = Math.signum(mVelocity);
-                    distance = sign * mOver * (3.0f * t2 - 2.0f * t * t2); 
-                    mCurrVelocity = sign * mOver * 6.0f * (- t + t2); 
+                    distance = sign * mOver * (3.0f * t2 - 2.0f * t * t2);
+                    mCurrVelocity = sign * mOver * 6.0f * (- t + t2);
                     break;
                 }
             }

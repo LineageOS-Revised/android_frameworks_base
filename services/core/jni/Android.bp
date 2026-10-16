@@ -75,6 +75,7 @@ cc_library_static {
         "com_android_server_sensor_SensorService.cpp",
         "com_android_server_utils_LongMethodTracer.cpp",
         "com_android_server_wm_TaskFpsCallbackController.cpp",
+        "com_android_server_activityTriggerService.cpp",
         "onload.cpp",
         ":lib_cachedAppOptimizer_native",
         ":lib_freezer_native",

@@ -197,6 +197,7 @@ import android.util.MathUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.apk.ApkSignatureVerifier;
+import android.util.BoostFramework;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -462,6 +463,13 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private final StagingManager mStagingManager;
     @NonNull
     private final DeveloperVerifierController mDeveloperVerifierController;
+    /*
+    * @hide
+    */
+    private BoostFramework mPerfBoostInstall = null;
+    private boolean mIsPerfLockAcquired = false;
+    private final int MAX_INSTALL_DURATION = 20000;
+
     private final InstallDependencyHelper mInstallDependencyHelper;
 
     final int sessionId;
@@ -2133,6 +2141,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     public ParcelFileDescriptor openWrite(String name, long offsetBytes, long lengthBytes) {
         assertCanWrite(false);
         try {
+            if (mPerfBoostInstall == null){
+                mPerfBoostInstall = new BoostFramework();
+            }
+            if (mPerfBoostInstall != null && !mIsPerfLockAcquired) {
+                mPerfBoostInstall.perfHint(BoostFramework.VENDOR_HINT_PACKAGE_INSTALL_BOOST,
+                        null, MAX_INSTALL_DURATION, -1);
+                mIsPerfLockAcquired = true;
+            }
             return doWriteInternal(name, offsetBytes, lengthBytes, null);
         } catch (IOException e) {
             throw ExceptionUtils.wrap(e);
@@ -2390,6 +2406,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void commit(@NonNull IntentSender statusReceiver, boolean forTransfer) {
+        if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
+            mPerfBoostInstall.perfLockRelease();
+            mIsPerfLockAcquired = false;
+        }
         assertNotChild("commit");
         boolean throwsExceptionCommitImmutableCheck = CompatChanges.isChangeEnabled(
                 THROW_EXCEPTION_COMMIT_WITH_IMMUTABLE_PENDING_INTENT, Binder.getCallingUid());
@@ -5769,6 +5789,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void abandon() {
+        if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
+            mPerfBoostInstall.perfLockRelease();
+            mIsPerfLockAcquired = false;
+        }
         final Runnable r;
         synchronized (mLock) {
             assertNotChild("abandon");

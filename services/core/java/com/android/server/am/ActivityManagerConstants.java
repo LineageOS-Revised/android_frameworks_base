@@ -54,6 +54,9 @@ import android.provider.DeviceConfig.Properties;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArraySet;
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+import android.util.BoostFramework;
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.KeyValueListParser;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
@@ -889,7 +892,12 @@ final class ActivityManagerConstants extends ContentObserver {
     private final KeyValueListParser mParser = new KeyValueListParser(',');
 
     private int mOverrideMaxCachedProcesses = -1;
-    private final int mCustomizedMaxCachedProcesses;
+    private int mCustomizedMaxCachedProcesses;
+
+    // QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+    /** Delay after boot before the first full system compaction (vendor tunable). */
+    static int COMPACTION_DELAY_MS = 300 * 1000;
+    // QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
     // The maximum number of cached processes we will keep around before killing them.
     // NOTE: this constant is *only* a control to not let us go too crazy with
@@ -1468,6 +1476,7 @@ final class ActivityManagerConstants extends ContentObserver {
                 .map(ComponentName::unflattenFromString).collect(Collectors.toSet()));
         mCustomizedMaxCachedProcesses = context.getResources().getInteger(
                 com.android.internal.R.integer.config_customizedMaxCachedProcesses);
+        applyVendorPerfConstants();
         CUR_MAX_CACHED_PROCESSES = mCustomizedMaxCachedProcesses;
         CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
 
@@ -1561,6 +1570,30 @@ final class ActivityManagerConstants extends ContentObserver {
     public int getOverrideMaxCachedProcesses() {
         return mOverrideMaxCachedProcesses;
     }
+
+    // QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
+    private void applyVendorPerfConstants() {
+        try {
+            final BoostFramework perf = new BoostFramework();
+            // Only use the vendor cached-app limit when the device overlay keeps the
+            // framework default, so an explicit device customization always wins.
+            final String bgAppsLimit = perf.perfGetProp("ro.vendor.qti.sys.fw.bg_apps_limit", "");
+            if (mCustomizedMaxCachedProcesses == 1024 && bgAppsLimit != null
+                    && !bgAppsLimit.isEmpty()) {
+                final int limit = Integer.parseInt(bgAppsLimit.trim());
+                if (limit > 0) {
+                    mCustomizedMaxCachedProcesses = limit;
+                }
+            }
+            COMPACTION_DELAY_MS = Integer.parseInt(perf.perfGetProp(
+                    "ro.vendor.qti.sys.fw.compaction_delay_sec", "300").trim()) * 1000;
+        } catch (RuntimeException e) {
+            Slog.w(TAG, "perf: failed to read vendor AM constants", e);
+        }
+        Slog.i(TAG, "perf: maxCachedProcesses=" + mCustomizedMaxCachedProcesses
+                + " compactionDelayMs=" + COMPACTION_DELAY_MS);
+    }
+    // QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
     public static int computeEmptyProcessLimit(int totalProcessLimit) {
         return totalProcessLimit/2;
