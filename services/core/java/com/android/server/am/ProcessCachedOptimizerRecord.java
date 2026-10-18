@@ -178,7 +178,9 @@ public final class ProcessCachedOptimizerRecord {
     CachedAppOptimizer.CompactProfile getLastCompactProfile() {
         if (mLastCompactProfile == null) {
             // The first compaction won't have a previous one, so assign one to avoid crashing.
-            mLastCompactProfile = CachedAppOptimizer.CompactProfile.SOME;
+// QTI_BEGIN: 2024-07-04: Core: CachedAppOptimizer: Initialize compactProfile and compactTime
+            mLastCompactProfile = CachedAppOptimizer.CompactProfile.FULL;
+// QTI_END: 2024-07-04: Core: CachedAppOptimizer: Initialize compactProfile and compactTime
         }
 
         return mLastCompactProfile;
@@ -320,6 +322,9 @@ public final class ProcessCachedOptimizerRecord {
 
     void init(long nowUptime) {
         mFreezeUnfreezeTime = nowUptime;
+// QTI_BEGIN: 2024-07-04: Core: CachedAppOptimizer: Initialize compactProfile and compactTime
+        mLastCompactTime = nowUptime;
+// QTI_END: 2024-07-04: Core: CachedAppOptimizer: Initialize compactProfile and compactTime
     }
 
     @GuardedBy("mProcLock")
