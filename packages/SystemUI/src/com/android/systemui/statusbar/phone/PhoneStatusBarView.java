@@ -44,6 +44,7 @@ import com.android.internal.policy.SystemBarUtils;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.gesture.StatusBarLongPressGestureDetector;
+import com.android.systemui.statusbar.layout.StatusBarContentInsetsProviderKt;
 import com.android.systemui.statusbar.phone.userswitcher.StatusBarUserSwitcherContainer;
 import com.android.systemui.user.ui.binder.StatusBarUserChipViewBinder;
 import com.android.systemui.user.ui.viewmodel.StatusBarUserChipViewModel;
@@ -123,6 +124,8 @@ public class PhoneStatusBarView extends FrameLayout {
     public void onFinishInflate() {
         super.onFinishInflate();
         mCutoutSpace = findViewById(R.id.cutout_space_view);
+        // Let negative user paddings draw into the privacy dot / corner area.
+        setClipToPadding(false);
 
         updateResources();
     }
@@ -319,10 +322,19 @@ public class PhoneStatusBarView extends FrameLayout {
         int statusBarPaddingStart = getResources().getDimensionPixelSize(
                 R.dimen.status_bar_padding_start);
 
-        findViewById(R.id.status_bar_contents).setPaddingRelative(
-                statusBarPaddingStart,
-                getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_padding_end),
+        final int statusBarPaddingEnd = getResources().getDimensionPixelSize(
+                R.dimen.status_bar_padding_end);
+        final boolean isRtl = isLayoutRtl();
+        findViewById(R.id.status_bar_contents).setPadding(
+                StatusBarContentInsetsProviderKt.statusBarPaddingPx(mContext,
+                        StatusBarContentInsetsProviderKt.STATUS_BAR_PADDING_LEFT,
+                        isRtl ? statusBarPaddingEnd : statusBarPaddingStart),
+                StatusBarContentInsetsProviderKt.statusBarPaddingPx(mContext,
+                        StatusBarContentInsetsProviderKt.STATUS_BAR_PADDING_TOP,
+                        getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top)),
+                StatusBarContentInsetsProviderKt.statusBarPaddingPx(mContext,
+                        StatusBarContentInsetsProviderKt.STATUS_BAR_PADDING_RIGHT,
+                        isRtl ? statusBarPaddingStart : statusBarPaddingEnd),
                 0);
 
         findViewById(R.id.notification_lights_out)
@@ -334,6 +346,13 @@ public class PhoneStatusBarView extends FrameLayout {
                 getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_end),
                 getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_bottom)
         );
+    }
+
+    /** Re-applies paddings after the status bar content insets changed. */
+    void onContentInsetsChanged() {
+        updatePaddings();
+        updateSafeInsets();
+        requestLayout();
     }
 
     private void updateLayoutForCutout() {
