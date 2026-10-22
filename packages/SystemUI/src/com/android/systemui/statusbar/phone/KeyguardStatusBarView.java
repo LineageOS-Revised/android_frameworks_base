@@ -47,6 +47,7 @@ import com.android.settingslib.Utils;
 import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider;
+import com.android.systemui.statusbar.layout.StatusBarContentInsetsProviderKt;
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher.DarkChange;
 import com.android.systemui.statusbar.phone.ui.TintedIconManager;
 import com.android.systemui.statusbar.phone.userswitcher.StatusBarUserSwitcherContainer;
@@ -157,7 +158,9 @@ public class KeyguardStatusBarView extends RelativeLayout {
         // mStatusIconArea
         mStatusIconArea.setPaddingRelative(
                 mStatusIconArea.getPaddingStart(),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top),
+                StatusBarContentInsetsProviderKt.statusBarPaddingPx(mContext,
+                        StatusBarContentInsetsProviderKt.STATUS_BAR_PADDING_TOP,
+                        getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top)),
                 mStatusIconArea.getPaddingEnd(),
                 mStatusIconArea.getPaddingBottom()
         );

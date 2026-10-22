@@ -19,9 +19,14 @@ package com.android.systemui.statusbar.layout
 import android.annotation.Px
 import android.content.Context
 import android.content.res.Resources
+import android.database.ContentObserver
 import android.graphics.Insets
 import android.graphics.Point
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.os.UserHandle
+import android.provider.Settings
 import android.util.LruCache
 import android.util.Pair
 import android.view.Display.DEFAULT_DISPLAY
@@ -165,7 +170,16 @@ constructor(
     private val dumpableName = TAG + nameSuffix
     private val commandName = StatusBarInsetsCommand.NAME + nameSuffix
 
+    private val paddingObserver =
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) = clearCachedInsets()
+        }
+
     override fun start() {
+        listOf(STATUS_BAR_PADDING_LEFT, STATUS_BAR_PADDING_RIGHT, STATUS_BAR_PADDING_TOP).forEach {
+            context.contentResolver.registerContentObserver(
+                Settings.System.getUriFor(it), false, paddingObserver, UserHandle.USER_ALL)
+        }
         configurationController.addCallback(this)
         dumpManager.registerNormalDumpable(dumpableName, this)
         commandRegistry.registerCommand(commandName) {
@@ -183,6 +197,7 @@ constructor(
     }
 
     override fun stop() {
+        context.contentResolver.unregisterContentObserver(paddingObserver)
         configurationController.removeCallback(this)
         dumpManager.unregisterDumpable(dumpableName)
         commandRegistry.unregisterCommand(commandName)
@@ -412,7 +427,11 @@ constructor(
 
     override fun getStatusBarPaddingTop(@Rotation rotation: Int?): Int {
         val res = rotation?.let { it -> getResourcesForRotation(it, context) } ?: context.resources
-        return res.getDimensionPixelSize(R.dimen.status_bar_padding_top)
+        return statusBarPaddingPx(
+            context,
+            STATUS_BAR_PADDING_TOP,
+            res.getDimensionPixelSize(R.dimen.status_bar_padding_top),
+        )
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
@@ -441,6 +460,16 @@ interface StatusBarContentInsetsChangedListener {
 
 private const val TAG = "StatusBarInsetsProvider"
 private const val MAX_CACHE_SIZE = 16
+
+const val STATUS_BAR_PADDING_LEFT = "status_bar_padding_left"
+const val STATUS_BAR_PADDING_RIGHT = "status_bar_padding_right"
+const val STATUS_BAR_PADDING_TOP = "status_bar_padding_top"
+
+/** User-set status bar padding in px (stored in dp, may be negative), else [defaultPx]. */
+fun statusBarPaddingPx(context: Context, key: String, defaultPx: Int): Int =
+    Settings.System.getStringForUser(context.contentResolver, key, UserHandle.USER_CURRENT)
+        ?.toIntOrNull()
+        ?.let { (it * context.resources.displayMetrics.density).toInt() } ?: defaultPx
 
 private fun getRotationZeroDisplayBounds(bounds: Rect, @Rotation exactRotation: Int): Rect {
     if (exactRotation == ROTATION_NONE || exactRotation == ROTATION_UPSIDE_DOWN) {

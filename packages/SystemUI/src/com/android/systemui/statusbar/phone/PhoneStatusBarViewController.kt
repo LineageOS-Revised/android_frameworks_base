@@ -42,6 +42,7 @@ import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.statusbar.core.StatusBarEventForwardingModernization
 import com.android.systemui.statusbar.data.repository.StatusBarConfigurationController
 import com.android.systemui.statusbar.gesture.StatusBarLongPressGestureDetector
+import com.android.systemui.statusbar.layout.StatusBarContentInsetsChangedListener
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.policy.Clock
 import com.android.systemui.statusbar.policy.ConfigurationController
@@ -203,7 +204,13 @@ private constructor(
         }
         progressProvider?.setReadyToHandleTransition(true)
         configurationController.addCallback(configurationListener)
+        statusBarContentInsetsProvider.addCallback(insetsChangedListener)
     }
+
+    private val insetsChangedListener =
+        object : StatusBarContentInsetsChangedListener {
+            override fun onStatusBarContentInsetsChanged() = mView.onContentInsetsChanged()
+        }
 
     private fun addCursorSupportToIconContainers() {
         endSideContainer = mView.requireViewById(R.id.system_icons)
@@ -262,6 +269,7 @@ private constructor(
         endSideContainer.setOnHoverListener(null)
         progressProvider?.setReadyToHandleTransition(false)
         configurationController.removeCallback(configurationListener)
+        statusBarContentInsetsProvider.removeCallback(insetsChangedListener)
     }
 
     init {
