@@ -25,22 +25,15 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Plays a UDFPS unlock animation: a one-shot fade-in, a looping element animation while the
- * finger is down and a one-shot fade-out. All callbacks are marshalled onto the main thread.
+ * Plays a UDFPS unlock animation: the frames loop while the finger is down and are cleared once
+ * it lifts. All callbacks are marshalled onto the main thread.
  */
 class UdfpsAnimationDrawable(
-    private val fadeInFrames: List<Drawable>,
-    private val fadeInDuration: Int,
-    private val elementFrames: List<Drawable>,
-    private val elementDuration: Int,
-    private val fadeOutFrames: List<Drawable>,
-    private val fadeOutDuration: Int,
+    private val frames: List<Drawable>,
+    private val frameDuration: Int,
 ) : Drawable() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var frames: List<Drawable> = emptyList()
-    private var frameDuration: Int = 16
-    private var looping: Boolean = false
     private var index: Int = 0
     private var running: Boolean = false
     private var current: Drawable? = null
@@ -50,9 +43,7 @@ class UdfpsAnimationDrawable(
         override fun run() {
             val list = frames
             if (!running || list.isEmpty()) return
-            if (index >= list.size) {
-                if (looping) index = 0 else return
-            }
+            if (index >= list.size) index = 0
             current = list[index]
             invalidateSelf()
             index++
@@ -60,11 +51,18 @@ class UdfpsAnimationDrawable(
         }
     }
 
-    fun show() = handler.post { play(fadeInFrames, fadeInDuration, loop = false) }
+    /** Nothing is drawn until the finger touches the sensor. */
+    fun show() = stop()
 
-    fun expand() = handler.post { play(elementFrames, elementDuration, loop = true) }
+    fun expand() = handler.post {
+        handler.removeCallbacks(advance)
+        if (frames.isEmpty()) return@post
+        index = 0
+        running = true
+        advance.run()
+    }
 
-    fun hide() = handler.post { play(fadeOutFrames, fadeOutDuration, loop = false) }
+    fun hide() = stop()
 
     fun stop() = handler.post {
         handler.removeCallbacks(advance)
@@ -72,20 +70,6 @@ class UdfpsAnimationDrawable(
         current = null
         index = 0
         invalidateSelf()
-    }
-
-    private fun play(list: List<Drawable>, duration: Int, loop: Boolean) {
-        handler.removeCallbacks(advance)
-        if (list.isEmpty()) {
-            stop()
-            return
-        }
-        frames = list
-        frameDuration = duration
-        looping = loop
-        index = 0
-        running = true
-        advance.run()
     }
 
     override fun draw(canvas: Canvas) {

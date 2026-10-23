@@ -133,24 +133,12 @@ class UdfpsAnimationRepository @Inject constructor(
         val element = loadFrames(res, packageName, elementBase, elementCount)
         if (element.isEmpty()) return null
 
+        // The fade-in/fade-out frames in these packs are the OxygenOS fingerprint glyph drawing
+        // itself in and out, which would sit on top of our own icon. Only the loop is used.
         return UdfpsAnimationDrawable(
-            fadeInFrames = loadFrames(
-                res, packageName, "kgd_osfingerprint_fadein",
-                intRes(res, packageName, "kgd_osfingerprint_fadein_anim_frames", 0),
-            ),
-            fadeInDuration = rateToDuration(
-                intRes(res, packageName, "kgd_osfingerprint_fadein_anim_rate", DEFAULT_RATE)
-            ),
-            elementFrames = element,
-            elementDuration = rateToDuration(
+            frames = element,
+            frameDuration = rateToDuration(
                 intRes(res, packageName, "kgd_osfingerprint_element_anim_rate", DEFAULT_RATE)
-            ),
-            fadeOutFrames = loadFrames(
-                res, packageName, "kgd_osfingerprint_fadeout",
-                intRes(res, packageName, "kgd_osfingerprint_fadeout_anim_frames", 0),
-            ),
-            fadeOutDuration = rateToDuration(
-                intRes(res, packageName, "kgd_osfingerprint_fadeout_anim_rate", DEFAULT_RATE)
             ),
         )
     }
