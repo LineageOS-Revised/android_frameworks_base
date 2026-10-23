@@ -410,6 +410,8 @@
     <string name="dynamic_island_open_clock_action">Open clock</string>
     <string name="dynamic_island_stopwatch_title">Stopwatch</string>
     <string name="dynamic_island_alarm_active_title">Alarm</string>
+    <!-- Badge on the dynamic island score card while a match is in progress. [CHAR LIMIT=8] -->
+    <string name="dynamic_island_live_badge">LIVE</string>
     <string name="dynamic_island_action_snooze">Snooze</string>
     <string name="dynamic_island_action_lap">Lap</string>
     <string name="dynamic_island_action_stop">Stop</string>

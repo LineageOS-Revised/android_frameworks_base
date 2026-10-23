@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.livescore.ui.compose
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -34,10 +36,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.android.systemui.common.ui.compose.Icon
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.livescore.shared.model.LiveScoreChipModel
 
 private val PopupShape = RoundedCornerShape(32.dp)
@@ -77,20 +81,30 @@ fun LiveScorePopup(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                model.title?.takeIf { it.isNotBlank() }?.let { title ->
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (model.isLive) {
+                        LiveBadge()
+                    }
+                    model.title?.takeIf { it.isNotBlank() }?.let { title ->
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 Text(
                     text = model.score,
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                     color = accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 model.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
                     Text(
@@ -105,3 +119,24 @@ fun LiveScorePopup(
         }
     }
 }
+
+@Composable
+private fun LiveBadge() {
+    Row(
+        modifier =
+            Modifier.background(color = LiveRed.copy(alpha = 0.16f), shape = CircleShape)
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(6.dp).background(color = LiveRed, shape = CircleShape))
+        Text(
+            text = stringResource(R.string.dynamic_island_live_badge),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = LiveRed,
+        )
+    }
+}
+
+private val LiveRed = Color(0xFFE5484D)
