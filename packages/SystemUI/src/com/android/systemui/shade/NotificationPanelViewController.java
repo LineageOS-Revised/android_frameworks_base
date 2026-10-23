@@ -4462,14 +4462,13 @@ public final class NotificationPanelViewController implements
 
             retickerAnimate();
 
-            if (reTickerIntent != null) {
-                mReTickerComeback.setOnClickListener(v -> {
-                    try {
-                        reTickerIntent.send();
-                    } catch (PendingIntent.CanceledException e) {}
-                    retickerDismiss(false);
-                });
-            }
+            final String reTickerKey = entry.getKey();
+            mReTickerComeback.setOnClickListener(reTickerIntent == null ? null : v -> {
+                mHeadsUpManager.removeNotification(reTickerKey, true, false, "reTicker clicked");
+                retickerDismiss(true);
+                mActivityStarter.startPendingIntentDismissingKeyguard(reTickerIntent);
+            });
+            mReTickerComeback.setClickable(reTickerIntent != null);
         } else {
             retickerDismiss(false);
         }
