@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,6 +38,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.sqrt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withContext
 
 private val DefaultReactiveLevels = floatArrayOf(0.22f, 0.45f, 0.34f, 0.56f)
 
@@ -61,70 +65,80 @@ fun AudioReactiveBars(
     }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
-    DisposableEffect(isPlaying) {
+    LaunchedEffect(isPlaying) {
         if (!isPlaying) {
             DefaultReactiveLevels.forEachIndexed { index, level -> levels[index] = level }
-            onDispose {}
-        } else {
-            var visualizer: Visualizer? = null
-            val listener =
-                object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(
-                        visualizer: Visualizer?,
-                        waveform: ByteArray?,
-                        samplingRate: Int,
-                    ) {
-                        val safeWaveform = waveform ?: return
-                        if (safeWaveform.isEmpty()) return
+            return@LaunchedEffect
+        }
+        val listener =
+            object : Visualizer.OnDataCaptureListener {
+                override fun onWaveFormDataCapture(
+                    visualizer: Visualizer?,
+                    waveform: ByteArray?,
+                    samplingRate: Int,
+                ) {
+                    val safeWaveform = waveform ?: return
+                    if (safeWaveform.isEmpty()) return
 
-                        val quarter = safeWaveform.size / 4
-                        val secondQuarter = quarter * 2
-                        val thirdQuarter = quarter * 3
-                        val newLevels =
-                            floatArrayOf(
-                                safeWaveform.windowEnergy(0, quarter),
-                                safeWaveform.windowEnergy(quarter, secondQuarter),
-                                safeWaveform.windowEnergy(secondQuarter, thirdQuarter),
-                                safeWaveform.windowEnergy(thirdQuarter, safeWaveform.size),
-                            )
+                    val quarter = safeWaveform.size / 4
+                    val secondQuarter = quarter * 2
+                    val thirdQuarter = quarter * 3
+                    val newLevels =
+                        floatArrayOf(
+                            safeWaveform.windowEnergy(0, quarter),
+                            safeWaveform.windowEnergy(quarter, secondQuarter),
+                            safeWaveform.windowEnergy(secondQuarter, thirdQuarter),
+                            safeWaveform.windowEnergy(thirdQuarter, safeWaveform.size),
+                        )
 
-                        mainHandler.post {
-                            for (index in newLevels.indices) {
-                                levels[index] =
-                                    (levels[index] * 0.65f + newLevels[index] * 0.35f)
-                                        .coerceIn(0.1f, 1f)
-                            }
+                    mainHandler.post {
+                        for (index in newLevels.indices) {
+                            levels[index] =
+                                (levels[index] * 0.65f + newLevels[index] * 0.35f)
+                                    .coerceIn(0.1f, 1f)
                         }
                     }
-
-                    override fun onFftDataCapture(
-                        visualizer: Visualizer?,
-                        fft: ByteArray?,
-                        samplingRate: Int,
-                    ) = Unit
                 }
 
-            runCatching {
-                    visualizer =
-                        Visualizer(0).apply {
-                            val captureSizes = Visualizer.getCaptureSizeRange()
-                            captureSize = captureSizes[1].coerceAtMost(256)
-                            setDataCaptureListener(
-                                listener,
-                                Visualizer.getMaxCaptureRate() / 2,
-                                true,
-                                false,
-                            )
-                            enabled = true
+                override fun onFftDataCapture(
+                    visualizer: Visualizer?,
+                    fft: ByteArray?,
+                    samplingRate: Int,
+                ) = Unit
+            }
+
+        // Creating a Visualizer is a binder call into audioserver, so keep it off the main
+        // thread. Written inside the block so it is released even if we're cancelled while
+        // creating it.
+        val visualizer = arrayOfNulls<Visualizer>(1)
+        try {
+            withContext(Dispatchers.IO) {
+                visualizer[0] =
+                    runCatching {
+                            Visualizer(0).apply {
+                                val captureSizes = Visualizer.getCaptureSizeRange()
+                                captureSize = captureSizes[1].coerceAtMost(256)
+                                setDataCaptureListener(
+                                    listener,
+                                    Visualizer.getMaxCaptureRate() / 2,
+                                    true,
+                                    false,
+                                )
+                                enabled = true
+                            }
                         }
+                        .getOrNull()
+            }
+            if (visualizer[0] == null) {
+                DefaultReactiveLevels.forEachIndexed { index, level -> levels[index] = level }
+            }
+            awaitCancellation()
+        } finally {
+            visualizer[0]?.let { created ->
+                withContext(NonCancellable + Dispatchers.IO) {
+                    runCatching { created.enabled = false }
+                    runCatching { created.release() }
                 }
-                .onFailure {
-                    DefaultReactiveLevels.forEachIndexed { index, level -> levels[index] = level }
-                }
-
-            onDispose {
-                runCatching { visualizer?.enabled = false }
-                runCatching { visualizer?.release() }
             }
         }
     }

@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.quickactions.alarm.ui.viewmodel
 import android.app.AlarmManager
 import android.app.Notification
 import android.content.Context
+import android.service.notification.StatusBarNotification
 import android.text.format.DateFormat
 import androidx.compose.runtime.getValue
 import com.android.systemui.ActivityIntentHelper
@@ -51,8 +52,12 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.Locale
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /** ViewModel backing the next-alarm page inside the dynamic island. */
@@ -74,48 +79,57 @@ constructor(
             traceName = "chip",
             initialValue = PopupChipModel.Hidden(PopupChipId.Alarm),
             source =
-                callbackFlow<AlarmPopupState> {
-                        var nextAlarm: AlarmManager.AlarmClockInfo? = null
-                        fun emitState() {
-                            trySend(
-                                AlarmPopupState(
-                                    nextAlarm = nextAlarm,
-                                    activeNotification =
-                                        notifCollection.allNotifs.firstOrNull { it.isAlarmCandidate() },
-                                )
-                            )
-                        }
-
-                        val callback =
-                            NextAlarmController.NextAlarmChangeCallback { updatedAlarm ->
-                                nextAlarm = updatedAlarm
-                                emitState()
-                            }
-                        val notificationListener =
-                            object : NotifCollectionListener {
-                                override fun onEntryAdded(entry: NotificationEntry) = emitState()
-
-                                override fun onEntryUpdated(entry: NotificationEntry) = emitState()
-
-                                override fun onEntryRemoved(entry: NotificationEntry, reason: Int) =
-                                    emitState()
-
-                                override fun onRankingApplied() = emitState()
-                            }
-
-                        nextAlarmController.addCallback(callback)
-                        notifCollection.addCollectionListener(notificationListener)
-                        emitState()
-                        awaitClose {
-                            nextAlarmController.removeCallback(callback)
-                            notifCollection.removeCollectionListener(notificationListener)
-                        }
-                    }
-                    .map(::toPopupChipModel)
-                    .combine(observeDynamicIslandFeatureEnabled(context, ALARMS)) { model, enabled ->
-                        if (enabled) model else PopupChipModel.Hidden(PopupChipId.Alarm)
+                observeDynamicIslandFeatureEnabled(context, ALARMS)
+                    .distinctUntilChanged()
+                    .flatMapLatest { enabled -> if (enabled) alarmState() else flowOf(null) }
+                    .map { state ->
+                        state?.let(::toPopupChipModel) ?: PopupChipModel.Hidden(PopupChipId.Alarm)
                     },
         )
+
+    private fun alarmState(): Flow<AlarmPopupState> =
+        callbackFlow<AlarmPopupState> {
+                var nextAlarm: AlarmManager.AlarmClockInfo? = null
+                fun emitState() {
+                    val activeNotification =
+                        notifCollection.allNotifs.firstOrNull { it.isAlarmCandidate() }
+                    trySend(
+                        AlarmPopupState(
+                            nextAlarm = nextAlarm,
+                            activeNotification = activeNotification,
+                            activeSbn = activeNotification?.sbn,
+                        )
+                    )
+                }
+
+                val callback =
+                    NextAlarmController.NextAlarmChangeCallback { updatedAlarm ->
+                        nextAlarm = updatedAlarm
+                        emitState()
+                    }
+                val notificationListener =
+                    object : NotifCollectionListener {
+                        override fun onEntryAdded(entry: NotificationEntry) = emitState()
+
+                        override fun onEntryUpdated(entry: NotificationEntry) = emitState()
+
+                        override fun onEntryRemoved(entry: NotificationEntry, reason: Int) =
+                            emitState()
+
+                        override fun onRankingApplied() = emitState()
+                    }
+
+                nextAlarmController.addCallback(callback)
+                notifCollection.addCollectionListener(notificationListener)
+                emitState()
+                awaitClose {
+                    nextAlarmController.removeCallback(callback)
+                    notifCollection.removeCollectionListener(notificationListener)
+                }
+            }
+            .conflate()
+            // Most notification events don't touch the alarm; skip rebuilding for those.
+            .distinctUntilChanged()
 
     override suspend fun onActivated(): Nothing {
         hydrator.activate()
@@ -230,6 +244,8 @@ constructor(
 private data class AlarmPopupState(
     val nextAlarm: AlarmManager.AlarmClockInfo?,
     val activeNotification: NotificationEntry?,
+    /** The entry is mutable; its sbn changes on each update, so it tells real changes apart. */
+    val activeSbn: StatusBarNotification?,
 )
 
 private fun NotificationEntry.isAlarmCandidate(): Boolean {
