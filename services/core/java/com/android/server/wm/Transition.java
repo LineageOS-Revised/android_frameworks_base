@@ -240,6 +240,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     /** Perf **/
     private BoostFramework mPerf = null;
     private boolean mIsAnimationPerfLockAcquired = false;
+    /** Cap for the open/close boost in case the transition never reports finish. */
+    private static final int TRANSITION_BOOST_MAX_MS = 2000;
+    private int mTransitionBoostHandle = -1;
 
 // QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 
@@ -909,6 +912,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_ANIM_BOOST, null);
             mIsAnimationPerfLockAcquired = true;
         }
+        acquireTransitionBoost();
 
 // QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
@@ -1860,6 +1864,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mPerf.perfLockRelease();
             mIsAnimationPerfLockAcquired = false;
         }
+        releaseTransitionBoost();
 // QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         // Rotation change may be deferred while there is a display change transition, so check
         // again in case there is a new pending change.
@@ -1986,6 +1991,27 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
     }
 
+    /**
+     * Hold a CPU boost for the whole open/close animation. The fixed-timeout anim boost and
+     * the velocity-based fling boost both end before slow gestures finish animating.
+     */
+    private void acquireTransitionBoost() {
+        if (mPerf == null || mTransitionBoostHandle > 0) return;
+        if (mType != TRANSIT_OPEN && mType != TRANSIT_CLOSE && mType != TRANSIT_TO_FRONT
+                && mType != TRANSIT_TO_BACK && mType < WindowManager.TRANSIT_FIRST_CUSTOM) {
+            return;
+        }
+        mTransitionBoostHandle = mPerf.perfHint(BoostFramework.VENDOR_HINT_SCROLL_BOOST, null,
+                TRANSITION_BOOST_MAX_MS, BoostFramework.Scroll.VERTICAL);
+    }
+
+    private void releaseTransitionBoost() {
+        if (mPerf != null && mTransitionBoostHandle > 0) {
+            mPerf.perfLockReleaseHandler(mTransitionBoostHandle);
+        }
+        mTransitionBoostHandle = -1;
+    }
+
     void abort() {
         // This calls back into itself via controller.abort, so just early return here.
         if (mState == STATE_ABORT) return;
@@ -2000,6 +2026,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                 "Aborting Transition: %d", mSyncId);
         mState = STATE_ABORT;
+        releaseTransitionBoost();
         mLogger.mAbortTimeNs = SystemClock.elapsedRealtimeNanos();
         mController.mTransitionTracer.logAbortedTransition(this);
         // Syncengine abort will call through to onTransactionReady()
