@@ -25,6 +25,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
@@ -83,41 +84,55 @@ constructor(
     /** The ID of the current chip that is showing its popup, or `null` if no chip is shown. */
     private var currentShownPopupChipId by mutableStateOf<PopupChipId?>(null)
 
-    private val incomingPopupChipBundle: PopupChipBundle by derivedStateOf {
-        PopupChipBundle(
-            media = mediaControlChip.chip,
-            screenRecord = screenRecordChip.chip,
-            liveScore = liveScoreChip.chip,
-            flashlight = flashlightChip.chip,
-            stopwatch = stopwatchChip.chip,
-            alarm = alarmChip.chip,
-        )
-    }
+    // Same lambda instances every time, so an unchanged chip stays equal and the island skips
+    // recomposing it.
+    private val hidePopupAction: () -> Unit = { currentShownPopupChipId = null }
+    private val popupActionsById = HashMap<PopupChipId, PopupActions>()
 
-    val shownPopupChips: List<PopupChipModel.Shown> by derivedStateOf {
-        if (!isDynamicIslandEnabled || isOnLockscreen) {
-            return@derivedStateOf emptyList()
+    private fun popupActions(chipId: PopupChipId): PopupActions =
+        popupActionsById.getOrPut(chipId) {
+            PopupActions(show = { currentShownPopupChipId = chipId })
         }
 
-        val bundle = incomingPopupChipBundle
-        val candidateChips =
-            listOfNotNull(
-                bundle.media,
-                bundle.screenRecord,
-                bundle.liveScore,
-                bundle.stopwatch,
-                bundle.alarm,
-                bundle.flashlight,
-            )
+    private class PopupActions(val show: () -> Unit)
 
-        candidateChips.filterIsInstance<PopupChipModel.Shown>().map { chip ->
-            chip.copy(
-                isPopupShown = chip.chipId == currentShownPopupChipId,
-                showPopup = { currentShownPopupChipId = chip.chipId },
-                hidePopup = { currentShownPopupChipId = null },
+    private val incomingPopupChipBundle: PopupChipBundle by
+        derivedStateOf(structuralEqualityPolicy()) {
+            PopupChipBundle(
+                media = mediaControlChip.chip,
+                screenRecord = screenRecordChip.chip,
+                liveScore = liveScoreChip.chip,
+                flashlight = flashlightChip.chip,
+                stopwatch = stopwatchChip.chip,
+                alarm = alarmChip.chip,
             )
         }
-    }
+
+    val shownPopupChips: List<PopupChipModel.Shown> by
+        derivedStateOf(structuralEqualityPolicy()) {
+            if (!isDynamicIslandEnabled || isOnLockscreen) {
+                return@derivedStateOf emptyList()
+            }
+
+            val bundle = incomingPopupChipBundle
+            val candidateChips =
+                listOfNotNull(
+                    bundle.media,
+                    bundle.screenRecord,
+                    bundle.liveScore,
+                    bundle.stopwatch,
+                    bundle.alarm,
+                    bundle.flashlight,
+                )
+
+            candidateChips.filterIsInstance<PopupChipModel.Shown>().map { chip ->
+                chip.copy(
+                    isPopupShown = chip.chipId == currentShownPopupChipId,
+                    showPopup = popupActions(chip.chipId).show,
+                    hidePopup = hidePopupAction,
+                )
+            }
+        }
 
     override suspend fun onActivated(): Nothing {
         coroutineScope {

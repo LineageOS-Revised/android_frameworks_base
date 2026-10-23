@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.quickactions.stopwatch.ui.viewmodel
 
 import android.app.Notification
 import android.content.Context
+import android.service.notification.StatusBarNotification
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Chronometer
@@ -52,8 +53,12 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.Locale
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /** ViewModel backing stopwatch notifications inside the dynamic island. */
@@ -69,56 +74,83 @@ constructor(
 ) : DynamicIslandChipViewModel, ExclusiveActivatable() {
     private val hydrator = Hydrator("StopwatchPopupChipViewModel.hydrator")
 
+    /**
+     * Last built model per notification. Building one inflates the app's RemoteViews, which is far
+     * too slow to redo on every notification event, so it is only rebuilt when that notification
+     * is actually updated.
+     */
+    private val modelCache = HashMap<String, CachedStopwatch>()
+
+    private val notificationChanges: Flow<Unit> =
+        callbackFlow {
+                val listener =
+                    object : NotifCollectionListener {
+                        override fun onEntryAdded(entry: NotificationEntry) {
+                            trySend(Unit)
+                        }
+
+                        override fun onEntryUpdated(entry: NotificationEntry) {
+                            trySend(Unit)
+                        }
+
+                        override fun onEntryRemoved(entry: NotificationEntry, reason: Int) {
+                            modelCache.remove(entry.key)
+                            trySend(Unit)
+                        }
+                    }
+
+                notifCollection.addCollectionListener(listener)
+                trySend(Unit)
+                awaitClose {
+                    notifCollection.removeCollectionListener(listener)
+                    modelCache.clear()
+                }
+            }
+            // A burst of notification events only needs one pass.
+            .conflate()
+
     override val chip: PopupChipModel by
         hydrator.hydratedStateOf(
             traceName = "chip",
             initialValue = PopupChipModel.Hidden(PopupChipId.Stopwatch),
             source =
-                callbackFlow {
-                        val listener =
-                            object : NotifCollectionListener {
-                                override fun onEntryAdded(entry: NotificationEntry) {
-                                    trySend(Unit)
-                                }
-
-                                override fun onEntryUpdated(entry: NotificationEntry) {
-                                    trySend(Unit)
-                                }
-
-                                override fun onEntryRemoved(entry: NotificationEntry, reason: Int) {
-                                    trySend(Unit)
-                                }
-
-                                override fun onRankingApplied() {
-                                    trySend(Unit)
-                                }
-                            }
-
-                        notifCollection.addCollectionListener(listener)
-                        trySend(Unit)
-                        awaitClose { notifCollection.removeCollectionListener(listener) }
+                observeDynamicIslandFeatureEnabled(context, STOPWATCH)
+                    .distinctUntilChanged()
+                    .flatMapLatest { enabled ->
+                        if (enabled) {
+                            notificationChanges.map { findStopwatch() }.distinctUntilChanged()
+                        } else {
+                            flowOf(null)
+                        }
                     }
-                    .map {
-                        notifCollection.allNotifs
-                            .asSequence()
-                            .mapNotNull { entry ->
-                                entry.toStopwatchModel(
-                                    context = context,
-                                    activityStarter = activityStarter,
-                                    activityIntentHelper = activityIntentHelper,
-                                    lockscreenUserManager = lockscreenUserManager,
-                                    keyguardStateController = keyguardStateController,
-                                )
-                            }
-                            .firstOrNull()
-                    }
-                    .map(::toPopupChipModel)
-                    .combine(
-                        observeDynamicIslandFeatureEnabled(context, STOPWATCH)
-                    ) { model, enabled ->
-                        if (enabled) model else PopupChipModel.Hidden(PopupChipId.Stopwatch)
-                    },
+                    .map(::toPopupChipModel),
         )
+
+    private fun findStopwatch(): StopwatchPopupModel? {
+        for (entry in notifCollection.allNotifs) {
+            // Cheap text check first; only clock apps get past it.
+            if (!entry.isStopwatchCandidate()) continue
+            val cached = modelCache[entry.key]
+            val model =
+                if (cached != null && cached.sbn === entry.sbn) {
+                    cached.model
+                } else {
+                    entry
+                        .toStopwatchModel(
+                            context = context,
+                            activityStarter = activityStarter,
+                            activityIntentHelper = activityIntentHelper,
+                            lockscreenUserManager = lockscreenUserManager,
+                            keyguardStateController = keyguardStateController,
+                        )
+                        .also { modelCache[entry.key] = CachedStopwatch(entry.sbn, it) }
+                }
+            if (model != null) return model
+        }
+        return null
+    }
+
+    private class CachedStopwatch(val sbn: StatusBarNotification, val model: StopwatchPopupModel?)
 
     override suspend fun onActivated(): Nothing {
         hydrator.activate()

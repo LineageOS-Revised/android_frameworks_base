@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import lineageos.providers.LineageSettings
 
@@ -114,16 +115,19 @@ constructor(
             ?: MediaControlState.Hidden
     }
 
+    private val legacyMediaData = MutableStateFlow<MediaData?>(null)
+
     /**
      * A flow of [MediaControlChipModel] representing the current state of the media controls chip.
      * This flow emits null when no active media is playing or when playback information is
      * unavailable. This flow is only active when [MediaControlsInComposeFlag] is disabled.
+     *
+     * Built on the background scope; it used to load the icon and artwork drawables on the main
+     * thread for every media update. [legacyMediaData] also drops updates with equal data.
      */
-    private val mediaControlChipModelLegacy = MutableStateFlow(MediaControlState.Hidden)
-
-    fun updateMediaControlChipModelLegacy(mediaData: MediaData?) {
-        if (!MediaControlsInComposeFlag.isEnabled) {
-            mediaControlChipModelLegacy.value =
+    private val mediaControlChipModelLegacy: StateFlow<MediaControlState> =
+        legacyMediaData
+            .map { mediaData ->
                 mediaData?.toMediaControlState(
                     context = context,
                     activityStarter = activityStarter,
@@ -131,6 +135,13 @@ constructor(
                     lockscreenUserManager = lockscreenUserManager,
                     keyguardStateController = keyguardStateController,
                 ) ?: MediaControlState.Hidden
+            }
+            .stateIn(backgroundScope, SharingStarted.WhileSubscribed(), MediaControlState.Hidden)
+
+    /** Called on the main thread by the media carousel; only hands the data over. */
+    fun updateMediaControlChipModelLegacy(mediaData: MediaData?) {
+        if (!MediaControlsInComposeFlag.isEnabled) {
+            legacyMediaData.value = mediaData
         }
     }
 

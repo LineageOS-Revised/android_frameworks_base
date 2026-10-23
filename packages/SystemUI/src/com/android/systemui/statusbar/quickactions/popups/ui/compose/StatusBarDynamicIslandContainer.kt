@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.using
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -33,16 +34,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipModel
@@ -62,7 +60,6 @@ fun StatusBarDynamicIslandContainer(
     var popupVisible by remember { mutableStateOf(false) }
     var knownChipIds by remember { mutableStateOf<List<PopupChipId>>(emptyList()) }
     var anchorBounds by remember { mutableStateOf<Rect?>(null) }
-    val view = LocalView.current
 
     LaunchedEffect(chips) {
         val currentChipIds = chips.map { it.chipId }
@@ -117,6 +114,10 @@ fun StatusBarDynamicIslandContainer(
         }
     }
 
+    // The swipe detector below is only restarted when the page count changes; this keeps it
+    // working with the current chips.
+    val currentSelectRelative by rememberUpdatedState<(Int) -> Unit> { selectRelative(it) }
+
     Box(
         modifier =
             modifier
@@ -127,28 +128,33 @@ fun StatusBarDynamicIslandContainer(
         AnimatedContent(
             targetState = selectedChip.chipId,
             transitionSpec = {
-                if (targetState == initialState) {
-                    fadeIn(animationSpec = tween(150)) togetherWith
-                        fadeOut(animationSpec = tween(150))
-                } else {
-                    val slideDirection =
-                        if (
-                            chips.indexOfFirst { it.chipId == targetState } >
-                                chips.indexOfFirst { it.chipId == initialState }
-                        ) {
-                            1
-                        } else {
-                            -1
-                        }
-                    (slideInHorizontally(
-                        animationSpec = tween(220),
-                        initialOffsetX = { fullWidth -> slideDirection * fullWidth / 2 },
-                    ) + fadeIn(animationSpec = tween(180))) togetherWith
-                        (slideOutHorizontally(
-                            animationSpec = tween(200),
-                            targetOffsetX = { fullWidth -> -slideDirection * fullWidth / 3 },
-                        ) + fadeOut(animationSpec = tween(140)))
-                }
+                val transform =
+                    if (targetState == initialState) {
+                        fadeIn(animationSpec = tween(150)) togetherWith
+                            fadeOut(animationSpec = tween(150))
+                    } else {
+                        val slideDirection =
+                            if (
+                                chips.indexOfFirst { it.chipId == targetState } >
+                                    chips.indexOfFirst { it.chipId == initialState }
+                            ) {
+                                1
+                            } else {
+                                -1
+                            }
+                        (slideInHorizontally(
+                            animationSpec = tween(220),
+                            initialOffsetX = { fullWidth -> slideDirection * fullWidth / 2 },
+                        ) + fadeIn(animationSpec = tween(180))) togetherWith
+                            (slideOutHorizontally(
+                                animationSpec = tween(200),
+                                targetOffsetX = { fullWidth -> -slideDirection * fullWidth / 3 },
+                            ) + fadeOut(animationSpec = tween(140)))
+                    }
+                // No size animation. The island lives in a wrap_content view inside the status
+                // bar, so animating its size re-lays out the whole status bar on every frame.
+                // Without it the size changes at most twice per transition.
+                transform using null
             },
             label = "dynamic_island_chip",
         ) { chipId ->
@@ -169,8 +175,8 @@ fun StatusBarDynamicIslandContainer(
                         detectHorizontalDragGestures(
                             onDragEnd = {
                                 when {
-                                    horizontalDragPx <= -thresholdPx -> selectRelative(1)
-                                    horizontalDragPx >= thresholdPx -> selectRelative(-1)
+                                    horizontalDragPx <= -thresholdPx -> currentSelectRelative(1)
+                                    horizontalDragPx >= thresholdPx -> currentSelectRelative(-1)
                                 }
                                 horizontalDragPx = 0f
                             },
@@ -197,12 +203,4 @@ fun StatusBarDynamicIslandContainer(
             )
         }
     }
-}
-
-private fun androidx.compose.ui.layout.LayoutCoordinates.boundsInScreen(
-    view: android.view.View
-): Rect {
-    val location = IntArray(2)
-    view.getLocationOnScreen(location)
-    return boundsInRoot().translate(Offset(location[0].toFloat(), location[1].toFloat()))
 }

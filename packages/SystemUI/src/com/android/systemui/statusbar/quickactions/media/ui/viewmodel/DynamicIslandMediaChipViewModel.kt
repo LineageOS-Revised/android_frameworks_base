@@ -101,7 +101,8 @@ constructor(
                     ChipIcon(
                         icon =
                             Icon.Loaded(drawable = icon, contentDescription = contentDescription),
-                        onClick = { action.run() },
+                        // A bound reference compares equal across updates; a new lambda wouldn't.
+                        onClick = action::run,
                     )
                 )
         )
@@ -114,8 +115,7 @@ constructor(
 
     private fun normalizeSongTitle(title: String, artist: String?): String {
         if (title.isBlank()) return title
-        val separatorRegex = Regex("\\s*[-–—|•]\\s*")
-        val parts = title.split(separatorRegex, limit = 2)
+        val parts = title.split(TITLE_SEPARATOR, limit = 2)
         if (parts.size != 2) return title
 
         val left = parts[0].trim()
@@ -134,6 +134,12 @@ constructor(
     }
 
     private fun String.toComparableKey(): String {
-        return lowercase(Locale.US).replace(Regex("[^a-z0-9]+"), " ").trim()
+        return lowercase(Locale.US).replace(NON_ALPHANUMERIC, " ").trim()
+    }
+
+    private companion object {
+        // Compiled once instead of on every media update.
+        val TITLE_SEPARATOR = Regex("\\s*[-–—|•]\\s*")
+        val NON_ALPHANUMERIC = Regex("[^a-z0-9]+")
     }
 }
