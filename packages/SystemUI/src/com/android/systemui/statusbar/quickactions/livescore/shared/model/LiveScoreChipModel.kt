@@ -27,4 +27,6 @@ data class LiveScoreChipModel(
     val score: String,
     val subtitle: String?,
     val onOpen: (() -> Unit)?,
+    /** False for a one-off alert such as a goal or the final score. */
+    val isLive: Boolean = true,
 )
