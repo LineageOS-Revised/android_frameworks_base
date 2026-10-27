@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -129,6 +130,7 @@ fun StatusBarDynamicIslandChip(
                     0.dp
                 }
             is PopupContentModel.ScreenRecord -> 11.dp
+            is PopupContentModel.Transfer -> 22.dp
             else -> {
                 if (pageCount > 1) 11.dp else 0.dp
             }
@@ -165,7 +167,9 @@ fun StatusBarDynamicIslandChip(
             val isArtworkLike =
                 index == 0 &&
                     (viewModel.popupContent is PopupContentModel.Media ||
-                        viewModel.popupContent is PopupContentModel.LiveScore)
+                        viewModel.popupContent is PopupContentModel.LiveScore ||
+                        viewModel.popupContent is PopupContentModel.Delivery ||
+                        viewModel.popupContent is PopupContentModel.Transfer)
             Icon(
                 icon = chipIcon.icon,
                 modifier = Modifier
@@ -233,6 +237,14 @@ fun StatusBarDynamicIslandChip(
                             ),
                     color = chipContentColor,
                     showSwipeHint = pageCount > 1,
+                )
+            is PopupContentModel.Transfer ->
+                CircularProgressIndicator(
+                    progress = { popupContent.model.percent / 100f },
+                    modifier = Modifier.size(14.dp),
+                    color = chipContentColor,
+                    strokeWidth = 2.dp,
+                    trackColor = chipContentColor.copy(alpha = 0.24f),
                 )
             else -> {
                 if (pageCount > 1) {

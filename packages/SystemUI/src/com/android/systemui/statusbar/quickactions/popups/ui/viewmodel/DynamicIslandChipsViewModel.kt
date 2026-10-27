@@ -32,7 +32,9 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.statusbar.quickactions.alarm.ui.viewmodel.AlarmPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.flashlight.ui.viewmodel.FlashlightPopupChipViewModel
+import com.android.systemui.statusbar.quickactions.delivery.ui.viewmodel.DeliveryPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.livescore.ui.viewmodel.LiveScorePopupChipViewModel
+import com.android.systemui.statusbar.quickactions.transfer.ui.viewmodel.TransferPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.media.ui.viewmodel.DynamicIslandMediaChipViewModel
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipModel
@@ -58,6 +60,8 @@ constructor(
     mediaControlChipFactory: DynamicIslandMediaChipViewModel.Factory,
     screenRecordChipFactory: ScreenRecordPopupChipViewModel.Factory,
     liveScoreChipFactory: LiveScorePopupChipViewModel.Factory,
+    deliveryChipFactory: DeliveryPopupChipViewModel.Factory,
+    transferChipFactory: TransferPopupChipViewModel.Factory,
     flashlightChipFactory: FlashlightPopupChipViewModel.Factory,
     stopwatchChipFactory: StopwatchPopupChipViewModel.Factory,
     alarmChipFactory: AlarmPopupChipViewModel.Factory,
@@ -66,6 +70,8 @@ constructor(
     private val mediaControlChip by lazy { mediaControlChipFactory.create() }
     private val screenRecordChip by lazy { screenRecordChipFactory.create() }
     private val liveScoreChip by lazy { liveScoreChipFactory.create() }
+    private val deliveryChip by lazy { deliveryChipFactory.create() }
+    private val transferChip by lazy { transferChipFactory.create() }
     private val flashlightChip by lazy { flashlightChipFactory.create() }
     private val stopwatchChip by lazy { stopwatchChipFactory.create() }
     private val alarmChip by lazy { alarmChipFactory.create() }
@@ -102,6 +108,8 @@ constructor(
                 media = mediaControlChip.chip,
                 screenRecord = screenRecordChip.chip,
                 liveScore = liveScoreChip.chip,
+                delivery = deliveryChip.chip,
+                transfer = transferChip.chip,
                 flashlight = flashlightChip.chip,
                 stopwatch = stopwatchChip.chip,
                 alarm = alarmChip.chip,
@@ -119,7 +127,9 @@ constructor(
                 listOfNotNull(
                     bundle.media,
                     bundle.screenRecord,
+                    bundle.delivery,
                     bundle.liveScore,
+                    bundle.transfer,
                     bundle.stopwatch,
                     bundle.alarm,
                     bundle.flashlight,
@@ -152,6 +162,8 @@ constructor(
             launch { mediaControlChip.activate() }
             launch { screenRecordChip.activate() }
             launch { liveScoreChip.activate() }
+            launch { deliveryChip.activate() }
+            launch { transferChip.activate() }
             launch { flashlightChip.activate() }
             launch { stopwatchChip.activate() }
             launch { alarmChip.activate() }
@@ -168,6 +180,8 @@ constructor(
         val screenRecord: PopupChipModel =
             PopupChipModel.Hidden(chipId = PopupChipId.ScreenRecord),
         val liveScore: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.LiveScore),
+        val delivery: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Delivery),
+        val transfer: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Transfer),
         val flashlight: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Flashlight),
         val stopwatch: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Stopwatch),
         val alarm: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Alarm),

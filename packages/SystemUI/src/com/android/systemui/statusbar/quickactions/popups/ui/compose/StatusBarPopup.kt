@@ -54,6 +54,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.alarm.ui.compose.AlarmPopup
+import com.android.systemui.statusbar.quickactions.delivery.ui.compose.DeliveryPopup
 import com.android.systemui.statusbar.quickactions.flashlight.ui.compose.FlashlightPopup
 import com.android.systemui.statusbar.quickactions.livescore.ui.compose.LiveScorePopup
 import com.android.systemui.statusbar.quickactions.media.ui.compose.DynamicIslandMediaPopup
@@ -62,6 +63,7 @@ import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipMode
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupContentModel
 import com.android.systemui.statusbar.quickactions.screenrecord.ui.compose.ScreenRecordPopup
 import com.android.systemui.statusbar.quickactions.stopwatch.ui.compose.StopwatchPopup
+import com.android.systemui.statusbar.quickactions.transfer.ui.compose.TransferPopup
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -255,6 +257,8 @@ fun StatusBarPopup(
                     }
                     is PopupContentModel.ScreenRecord -> ScreenRecordPopup(model = popupContent.model)
                     is PopupContentModel.LiveScore -> LiveScorePopup(model = popupContent.model)
+                    is PopupContentModel.Delivery -> DeliveryPopup(model = popupContent.model)
+                    is PopupContentModel.Transfer -> TransferPopup(model = popupContent.model)
                     is PopupContentModel.Flashlight -> FlashlightPopup(model = popupContent.model)
                     is PopupContentModel.Stopwatch -> StopwatchPopup(model = popupContent.model)
                     is PopupContentModel.Alarm -> AlarmPopup(model = popupContent.model)

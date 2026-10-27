@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.quickactions.livescore.domain
 
+import com.android.systemui.statusbar.quickactions.delivery.domain.DeliveryParser
+
 /** Notification text used to detect a live score. Plain strings so it is easy to unit test. */
 data class LiveScoreInput(
     val packageName: String,
@@ -126,7 +128,10 @@ object LiveScoreParser {
         packageName in SPORTS_PACKAGES || SPORTS_PACKAGES.any { packageName.startsWith("$it.") }
 
     fun parse(input: LiveScoreInput): ParsedLiveScore? {
-        if (input.isExcludedStyle || input.category in EXCLUDED_CATEGORIES) {
+        if (input.isExcludedStyle ||
+            input.category in EXCLUDED_CATEGORIES ||
+            DeliveryParser.isDeliveryApp(input.packageName)
+        ) {
             return null
         }
         val sportsApp = isSportsApp(input.packageName)
