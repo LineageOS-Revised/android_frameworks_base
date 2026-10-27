@@ -37,6 +37,7 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private var ghbmView: UdfpsSurfaceView? = null
     private var animView: UdfpsAnimView? = null
     private var udfpsDisplayMode: UdfpsDisplayModeProvider? = null
+    private var isSensorPressed = false
 
     // sensorRect may be bigger than the sensor. True sensor dimensions are defined in
     // overlayParams.sensorBounds
@@ -77,8 +78,14 @@ class UdfpsTouchOverlay(context: Context, attrs: AttributeSet?) : FrameLayout(co
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> animView?.expand()
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> animView?.hide()
+            MotionEvent.ACTION_DOWN -> {
+                isSensorPressed = sensorRect.contains(event.x.toInt(), event.y.toInt())
+                if (isSensorPressed) animView?.expand()
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (isSensorPressed) animView?.hide()
+                isSensorPressed = false
+            }
         }
         return super.dispatchTouchEvent(event)
     }
