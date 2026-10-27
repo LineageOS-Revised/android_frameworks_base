@@ -95,7 +95,7 @@ constructor(
     }
 
     override fun toChip(
-        shown: List<ActiveItem<ParsedDelivery>>,
+        shown: List<NotificationIslandChipViewModel.ActiveItem<ParsedDelivery>>,
         icon: Icon?,
         onOpen: (() -> Unit)?,
     ): PopupChipModel.Shown {

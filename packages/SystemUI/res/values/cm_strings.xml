@@ -71,6 +71,9 @@
     <string name="accessibility_quick_settings_caffeine_off">Caffeine off.</string>
     <string name="accessibility_quick_settings_caffeine_on">Caffeine on.</string>
 
+    <!-- System monitor QS tile -->
+    <string name="quick_settings_system_monitor_label">System monitor</string>
+
     <!-- CPU info QS tile -->
     <string name="quick_settings_cpu_info_label">CPU info</string>
     <string name="accessibility_quick_settings_cpu_info_off">CPU info overlay off.</string>

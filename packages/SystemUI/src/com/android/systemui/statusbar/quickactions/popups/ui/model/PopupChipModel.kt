@@ -21,6 +21,7 @@ import com.android.systemui.statusbar.quickactions.flashlight.shared.model.Flash
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.statusbar.quickactions.delivery.shared.model.DeliveryChipModel
 import com.android.systemui.statusbar.quickactions.livescore.shared.model.LiveScoreChipModel
+import com.android.systemui.statusbar.quickactions.sysmon.shared.model.SystemMonitorPopupModel
 import com.android.systemui.statusbar.quickactions.transfer.shared.model.TransferChipModel
 import com.android.systemui.statusbar.quickactions.media.shared.model.MediaControlChipModel
 import com.android.systemui.statusbar.quickactions.screenrecord.shared.model.ScreenRecordPopupModel
@@ -40,6 +41,8 @@ sealed class PopupChipId(val value: String) {
     data object Delivery : PopupChipId("Delivery")
 
     data object Transfer : PopupChipId("Transfer")
+
+    data object SystemMonitor : PopupChipId("SystemMonitor")
 
     data object Flashlight : PopupChipId("Flashlight")
 
@@ -77,6 +80,8 @@ sealed interface PopupContentModel {
     data class Delivery(val model: DeliveryChipModel) : PopupContentModel
 
     data class Transfer(val model: TransferChipModel) : PopupContentModel
+
+    data class SystemMonitor(val model: SystemMonitorPopupModel) : PopupContentModel
 
     data class Flashlight(val model: FlashlightPopupModel) : PopupContentModel
 

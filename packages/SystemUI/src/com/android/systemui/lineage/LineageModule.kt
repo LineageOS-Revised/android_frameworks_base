@@ -24,6 +24,7 @@ import com.android.systemui.qs.tiles.AmbientDisplayTile
 import com.android.systemui.qs.tiles.AODTile
 import com.android.systemui.qs.tiles.CaffeineTile
 import com.android.systemui.qs.tiles.CpuInfoTile
+import com.android.systemui.qs.tiles.SystemMonitorTile
 import com.android.systemui.qs.tiles.FpsInfoTile
 import com.android.systemui.qs.tiles.HeadsUpTile
 import com.android.systemui.qs.tiles.PowerShareTile
@@ -74,6 +75,12 @@ interface LineageModule {
     @StringKey(FpsInfoTile.TILE_SPEC)
     fun bindFpsInfoTile(fpsInfoTile: FpsInfoTile): QSTileImpl<*>
 
+    /** Inject SystemMonitorTile into tileMap in QSModule */
+    @Binds
+    @IntoMap
+    @StringKey(SystemMonitorTile.TILE_SPEC)
+    fun bindSystemMonitorTile(systemMonitorTile: SystemMonitorTile): QSTileImpl<*>
+
     /** Inject HeadsUpTile into tileMap in QSModule */
     @Binds
     @IntoMap
@@ -122,6 +129,7 @@ interface LineageModule {
         const val CAFFEINE_TILE_SPEC = "caffeine"
         const val CPU_INFO_TILE_SPEC = "cpu_info"
         const val FPS_INFO_TILE_SPEC = "fps_info"
+        const val SYSTEM_MONITOR_TILE_SPEC = "system_monitor"
         const val HEADS_UP_TILE_SPEC = "heads_up"
         const val POWERSHARE_TILE_SPEC = "powershare"
         const val PROFILES_TILE_SPEC = "profiles"
@@ -185,6 +193,21 @@ interface LineageModule {
                     QSTileUIConfig.Resource(
                         iconRes = R.drawable.ic_qs_cpu_info,
                         labelRes = R.string.quick_settings_cpu_info_label
+                    ),
+                instanceId = uiEventLogger.getNewInstanceId(),
+                category = TileCategory.UTILITIES,
+            )
+
+        @Provides
+        @IntoMap
+        @StringKey(SYSTEM_MONITOR_TILE_SPEC)
+        fun provideSystemMonitorTileConfig(uiEventLogger: QsEventLogger): QSTileConfig =
+            QSTileConfig(
+                tileSpec = TileSpec.create(SYSTEM_MONITOR_TILE_SPEC),
+                uiConfig =
+                    QSTileUIConfig.Resource(
+                        iconRes = R.drawable.ic_qs_system_monitor,
+                        labelRes = R.string.quick_settings_system_monitor_label
                     ),
                 instanceId = uiEventLogger.getNewInstanceId(),
                 category = TileCategory.UTILITIES,

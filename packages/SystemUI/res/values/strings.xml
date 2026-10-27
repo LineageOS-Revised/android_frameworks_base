@@ -417,6 +417,10 @@
     <string name="dynamic_island_delivery_on_the_way">On the way</string>
     <string name="dynamic_island_delivery_arriving">Arriving</string>
     <string name="dynamic_island_transfer_more">+%1$d more</string>
+    <string name="system_monitor_title">System monitor</string>
+    <string name="system_monitor_close">Close</string>
+    <string name="system_monitor_battery">Battery</string>
+    <string name="system_monitor_top">Top processes</string>
     <string name="dynamic_island_action_snooze">Snooze</string>
     <string name="dynamic_island_action_lap">Lap</string>
     <string name="dynamic_island_action_stop">Stop</string>

@@ -36,6 +36,7 @@ object DynamicIslandFeatureSettings {
     const val LIVE_SCORES = "status_bar_dynamic_island_live_scores"
     const val DELIVERY = "status_bar_dynamic_island_delivery"
     const val TRANSFERS = "status_bar_dynamic_island_transfers"
+    const val SYSTEM_MONITOR = "status_bar_dynamic_island_system_monitor"
     const val SHOW_LYRICS = "status_bar_dynamic_island_lyrics"
 
     fun ContentResolver.readDynamicIslandFeatureEnabled(
