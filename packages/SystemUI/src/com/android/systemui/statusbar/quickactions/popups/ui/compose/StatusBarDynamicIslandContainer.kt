@@ -54,6 +54,7 @@ fun StatusBarDynamicIslandContainer(
     modifier: Modifier = Modifier,
 ) {
     val cutoutSpec = rememberDynamicIslandCutoutSpec()
+    val cutoutOffsetPx = with(LocalDensity.current) { cutoutSpec.horizontalOffset.roundToPx() }
     var selectedChipId by remember { mutableStateOf<PopupChipId?>(null) }
     var popupAnchorChip by remember { mutableStateOf<PopupChipModel.Shown?>(null) }
     var popupVisible by remember { mutableStateOf(false) }
@@ -165,9 +166,11 @@ fun StatusBarDynamicIslandContainer(
                 viewModel = chip,
                 pageCount = chips.size,
                 cutoutSpec = cutoutSpec,
-                onChipBoundsChanged = { bounds ->
-                    anchorBounds = bounds
-                    onIslandWidthChanged(bounds.width.toInt())
+                onChipBoundsChanged = { bounds -> anchorBounds = bounds },
+                onReservedWidthChanged = { width ->
+                    if (chipId == selectedChipId) {
+                        onIslandWidthChanged(width + 2 * abs(cutoutOffsetPx))
+                    }
                 },
                 modifier =
                     Modifier.pointerInput(chips.size, chip.chipId) {

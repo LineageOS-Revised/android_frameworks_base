@@ -318,6 +318,7 @@ fun StatusBarRoot(
                         setContent {
                             StatusBarDynamicIslandContainer(
                                 chips = statusBarViewModel.dynamicIslandChips,
+                                onIslandWidthChanged = phoneStatusBarView::setDynamicIslandWidth,
                             )
                         }
                     }

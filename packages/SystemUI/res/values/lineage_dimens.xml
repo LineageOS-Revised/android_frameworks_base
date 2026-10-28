@@ -27,4 +27,7 @@
 
     <!-- Vertical offset of the UDFPS unlock animation from the sensor center -->
     <dimen name="udfps_animation_offset">0dp</dimen>
+
+    <!-- Space kept between the dynamic island and the status bar icons on each side -->
+    <dimen name="status_bar_dynamic_island_side_margin">8dp</dimen>
 </resources>

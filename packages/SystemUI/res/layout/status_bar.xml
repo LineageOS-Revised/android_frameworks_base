@@ -53,7 +53,7 @@
 
         <!-- Container for the entire start half of the status bar. It will always use the same
              width, independent of the number of visible children and sub-children. -->
-        <FrameLayout
+        <com.android.systemui.statusbar.phone.IslandAwareSideContainer
             android:id="@+id/status_bar_start_side_container"
             android:layout_height="match_parent"
             android:layout_width="0dp"
@@ -135,7 +135,7 @@
 
                 </LinearLayout>
             </FrameLayout>
-        </FrameLayout>
+        </com.android.systemui.statusbar.phone.IslandAwareSideContainer>
 
         <!-- Space should cover the notch (if it exists) and let other views lay out around it -->
         <android.widget.Space
@@ -147,7 +147,7 @@
 
         <!-- Container for the entire end half of the status bar. It will always use the same
              width, independent of the number of visible children and sub-children. -->
-        <FrameLayout
+        <com.android.systemui.statusbar.phone.IslandAwareSideContainer
             android:id="@+id/status_bar_end_side_container"
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -196,7 +196,7 @@
                      android:layout_width="wrap_content"
                      android:layout_height="@dimen/status_bar_icon_container_height" />
             </com.android.keyguard.AlphaOptimizedLinearLayout>
-        </FrameLayout>
+        </com.android.systemui.statusbar.phone.IslandAwareSideContainer>
     </LinearLayout>
 
     <com.android.keyguard.AlphaOptimizedLinearLayout

@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -53,7 +54,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -70,6 +73,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** Single centered status bar capsule styled like a compact dynamic island. */
 @Composable
@@ -80,6 +84,7 @@ fun StatusBarDynamicIslandChip(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
     onChipBoundsChanged: (Rect) -> Unit = {},
+    onReservedWidthChanged: (Int) -> Unit = {},
 ) {
     val isMediaChip = viewModel.popupContent is PopupContentModel.Media
     val chipShape = RoundedCornerShape(50)
@@ -100,24 +105,38 @@ fun StatusBarDynamicIslandChip(
             colorScheme = MaterialTheme.colorScheme,
         )
     val view = LocalView.current
+    val split = remember { CutoutSplit() }
     val boundsModifier =
         Modifier.onGloballyPositioned { coordinates ->
             onChipBoundsChanged(coordinates.boundsInScreen(view))
+            onReservedWidthChanged(coordinates.size.width + 2 * abs(split.shiftPx))
+        }
+    // Moves the chip sideways so the gap left for the camera sits right over the cutout. Room
+    // is kept on both sides so the island view stays centered and nothing gets clipped.
+    val cutoutAlignModifier =
+        Modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            val shift = split.shiftPx
+            layout(placeable.width + 2 * abs(shift), placeable.height) {
+                placeable.place(abs(shift) + shift, 0)
+            }
         }
     if (viewModel.popupContent.isUtilityStatusContent() && viewModel.icons.isNotEmpty()) {
         UtilityStatusIslandChip(
             viewModel = viewModel,
             onTap = onTap,
             cutoutSpec = cutoutSpec,
+            split = split,
             chipBackgroundColor = chipBackgroundColor,
             chipContentColor = chipContentColor,
             chipOutline = chipOutline,
-            modifier = modifier.then(boundsModifier),
+            modifier = modifier.then(cutoutAlignModifier).then(boundsModifier),
         )
         return
     }
 
-    val compactWidth = compactIslandWidthFor(viewModel.popupContent)
+    val cutoutGap = if (cutoutSpec.hasCutout) cutoutSpec.embeddedGapWidth else 0.dp
+    val compactWidth = compactIslandWidthFor(viewModel.popupContent)?.plus(cutoutGap)
     val hasInlineTimer = viewModel.popupContent is PopupContentModel.Stopwatch
     val trailingDecorationWidth =
         when (val popupContent = viewModel.popupContent) {
@@ -144,115 +163,160 @@ fun StatusBarDynamicIslandChip(
         (CompactIslandMaxWidth - 24.dp - leadingDecorationWidth - trailingDecorationWidth)
             .coerceAtLeast(56.dp)
 
-    Row(
+    val leading: @Composable () -> Unit = {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            viewModel.icons.forEachIndexed { index, chipIcon ->
+                val isArtworkLike =
+                    index == 0 &&
+                        (viewModel.popupContent is PopupContentModel.Media ||
+                            viewModel.popupContent is PopupContentModel.LiveScore ||
+                            viewModel.popupContent is PopupContentModel.Delivery ||
+                            viewModel.popupContent is PopupContentModel.Transfer)
+                Icon(
+                    icon = chipIcon.icon,
+                    modifier = Modifier
+                        .size(if (isArtworkLike) 18.dp else 16.dp)
+                        .then(
+                            if (isArtworkLike) {
+                                Modifier.clip(CircleShape)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    tint = if (isArtworkLike) Color.Unspecified else chipContentColor,
+                )
+            }
+        }
+    }
+
+    val trailing: @Composable () -> Unit = {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            viewModel.chipText
+                ?.takeIf {
+                    !isMediaChip &&
+                        viewModel.popupContent !is PopupContentModel.ScreenRecord &&
+                        !hasInlineTimer &&
+                        it.isNotBlank()
+                }
+                ?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = chipContentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = maxTextWidth),
+                    )
+                }
+
+            when (val popupContent = viewModel.popupContent) {
+                is PopupContentModel.Media ->
+                    if (popupContent.model.isPlaying) {
+                        AudioReactiveBars(
+                            isPlaying = true,
+                            color = chipContentColor,
+                        )
+                    } else if (pageCount > 1) {
+                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
+                    }
+                is PopupContentModel.ScreenRecord ->
+                    when (val model = popupContent.model) {
+                        is ScreenRecordPopupModel.Starting ->
+                            StatusContent(
+                                text = viewModel.chipText.orEmpty(),
+                                color = chipContentColor,
+                                showSwipeHint = pageCount > 1,
+                            )
+                        is ScreenRecordPopupModel.Recording ->
+                            StatusContent(
+                                text = viewModel.chipText.orEmpty(),
+                                color = chipContentColor,
+                                showSwipeHint = pageCount > 1,
+                            )
+                    }
+                is PopupContentModel.Stopwatch ->
+                    StatusContent(
+                        text =
+                            popupContent.model.elapsedTimeText
+                                ?: rememberElapsedDurationText(
+                                    popupContent.model.baseElapsedRealtimeMs
+                                ),
+                        color = chipContentColor,
+                        showSwipeHint = pageCount > 1,
+                    )
+                is PopupContentModel.Transfer ->
+                    CircularProgressIndicator(
+                        progress = { popupContent.model.percent / 100f },
+                        modifier = Modifier.size(14.dp),
+                        color = chipContentColor,
+                        strokeWidth = 2.dp,
+                        trackColor = chipContentColor.copy(alpha = 0.24f),
+                    )
+                else -> {
+                    if (pageCount > 1) {
+                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
+                    }
+                }
+            }
+        }
+    }
+
+    val hasCutout = cutoutSpec.hasCutout
+    Layout(
+        contents = listOf(leading, trailing),
         modifier =
             modifier
+                .then(cutoutAlignModifier)
                 .then(boundsModifier)
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
                 .widthIn(
                     min = compactWidth ?: 0.dp,
-                    max = compactWidth ?: CompactIslandMaxWidth,
+                    max = compactWidth ?: (CompactIslandMaxWidth + cutoutGap),
                 )
                 .clip(chipShape)
                 .background(chipBackgroundColor)
                 .border(width = 1.dp, color = chipOutline, shape = chipShape)
                 .clickable(onClick = onTap)
                 .padding(horizontal = 12.dp, vertical = 7.dp),
-        horizontalArrangement =
-            if (isMediaChip) Arrangement.SpaceBetween else Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        viewModel.icons.forEachIndexed { index, chipIcon ->
-            val isArtworkLike =
-                index == 0 &&
-                    (viewModel.popupContent is PopupContentModel.Media ||
-                        viewModel.popupContent is PopupContentModel.LiveScore ||
-                        viewModel.popupContent is PopupContentModel.Delivery ||
-                        viewModel.popupContent is PopupContentModel.Transfer)
-            Icon(
-                icon = chipIcon.icon,
-                modifier = Modifier
-                    .size(if (isArtworkLike) 18.dp else 16.dp)
-                    .then(
-                        if (isArtworkLike) {
-                            Modifier.clip(CircleShape)
-                        } else {
-                            Modifier
-                        }
-                    ),
-                tint = if (isArtworkLike) Color.Unspecified else chipContentColor,
-            )
-        }
-
-        viewModel.chipText
-            ?.takeIf {
-                !isMediaChip &&
-                    viewModel.popupContent !is PopupContentModel.ScreenRecord &&
-                    !hasInlineTimer &&
-                    it.isNotBlank()
+    ) { (leadingMeasurables, trailingMeasurables), constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val left = leadingMeasurables.map { it.measure(loose) }
+        val leftWidth = left.maxOfOrNull { it.width } ?: 0
+        val hasLeft = viewModel.icons.isNotEmpty()
+        val spacing =
+            when {
+                hasCutout -> cutoutGap.roundToPx()
+                hasLeft -> 8.dp.roundToPx()
+                else -> 0
             }
-            ?.let { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = chipContentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = maxTextWidth),
-                )
-            }
-
-        when (val popupContent = viewModel.popupContent) {
-            is PopupContentModel.Media ->
-                if (popupContent.model.isPlaying) {
-                    AudioReactiveBars(
-                        isPlaying = true,
-                        color = chipContentColor,
-                    )
-                } else if (pageCount > 1) {
-                    SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
-                }
-            is PopupContentModel.ScreenRecord ->
-                when (val model = popupContent.model) {
-                    is ScreenRecordPopupModel.Starting ->
-                        StatusContent(
-                            text = viewModel.chipText.orEmpty(),
-                            color = chipContentColor,
-                            showSwipeHint = pageCount > 1,
-                        )
-                    is ScreenRecordPopupModel.Recording ->
-                        StatusContent(
-                            text = viewModel.chipText.orEmpty(),
-                            color = chipContentColor,
-                            showSwipeHint = pageCount > 1,
-                        )
-                }
-            is PopupContentModel.Stopwatch ->
-                StatusContent(
-                    text =
-                        popupContent.model.elapsedTimeText
-                            ?: rememberElapsedDurationText(
-                                popupContent.model.baseElapsedRealtimeMs
-                            ),
-                    color = chipContentColor,
-                    showSwipeHint = pageCount > 1,
-                )
-            is PopupContentModel.Transfer ->
-                CircularProgressIndicator(
-                    progress = { popupContent.model.percent / 100f },
-                    modifier = Modifier.size(14.dp),
-                    color = chipContentColor,
-                    strokeWidth = 2.dp,
-                    trackColor = chipContentColor.copy(alpha = 0.24f),
-                )
-            else -> {
-                if (pageCount > 1) {
-                    SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
-                }
-            }
+        val usedLeft = if (hasLeft) leftWidth else 0
+        val rightConstraints =
+            loose.copy(maxWidth = (constraints.maxWidth - usedLeft - spacing).coerceAtLeast(0))
+        val right = trailingMeasurables.map { it.measure(rightConstraints) }
+        val rightWidth = right.maxOfOrNull { it.width } ?: 0
+        val width =
+            (usedLeft + spacing + rightWidth).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height =
+            maxOf(left.maxOfOrNull { it.height } ?: 0, right.maxOfOrNull { it.height } ?: 0)
+                .coerceIn(constraints.minHeight, constraints.maxHeight)
+        split.shiftPx = if (hasCutout) (rightWidth - usedLeft) / 2 else 0
+        layout(width, height) {
+            if (hasLeft) left.forEach { it.place(0, (height - it.height) / 2) }
+            right.forEach { it.place(width - rightWidth, (height - it.height) / 2) }
         }
     }
+}
+
+/** Sideways shift that puts the chip's camera gap over the cutout. */
+private class CutoutSplit {
+    var shiftPx by mutableIntStateOf(0)
 }
 
 @Composable
@@ -260,6 +324,7 @@ private fun UtilityStatusIslandChip(
     viewModel: PopupChipModel.Shown,
     onTap: () -> Unit,
     cutoutSpec: DynamicIslandCutoutSpec,
+    split: CutoutSplit,
     chipBackgroundColor: Color,
     chipContentColor: Color,
     chipOutline: Color,
@@ -298,6 +363,19 @@ private fun UtilityStatusIslandChip(
     Row(
         modifier =
             modifier
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    // Icon side is 10dp + 16dp icon; everything after the gap is the other side.
+                    val iconSide = 26.dp.roundToPx()
+                    val gap = cutoutSpec.embeddedGapWidth.roundToPx()
+                    split.shiftPx =
+                        if (cutoutSpec.hasCutout) {
+                            (placeable.width - gap - 2 * iconSide) / 2
+                        } else {
+                            0
+                        }
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
                 .width(connectedIslandWidth)
@@ -389,6 +467,7 @@ private val DynamicIslandEmbeddedGapSidePadding = 10.dp
 data class DynamicIslandCutoutSpec(
     val embeddedGapWidth: Dp,
     val horizontalOffset: Dp,
+    val hasCutout: Boolean,
 )
 
 @Composable
@@ -409,6 +488,7 @@ fun rememberDynamicIslandCutoutSpec(): DynamicIslandCutoutSpec {
             DynamicIslandCutoutSpec(
                 embeddedGapWidth = DynamicIslandEmbeddedGapFallbackWidth,
                 horizontalOffset = 0.dp,
+                hasCutout = false,
             )
         } else {
             val embeddedGapWidthDp =
@@ -421,6 +501,7 @@ fun rememberDynamicIslandCutoutSpec(): DynamicIslandCutoutSpec {
             DynamicIslandCutoutSpec(
                 embeddedGapWidth = embeddedGapWidthDp,
                 horizontalOffset = horizontalOffsetDp,
+                hasCutout = true,
             )
         }
     }

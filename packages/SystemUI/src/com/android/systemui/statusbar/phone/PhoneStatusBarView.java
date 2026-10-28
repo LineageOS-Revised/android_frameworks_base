@@ -82,6 +82,13 @@ public class PhoneStatusBarView extends FrameLayout {
      */
     private int mCutoutSideNudge = 0;
 
+    /** Width the dynamic island needs in the middle of the status bar, or 0 when hidden. */
+    private int mDynamicIslandWidth = 0;
+    @Nullable
+    private IslandAwareSideContainer mStartSideContainer;
+    @Nullable
+    private IslandAwareSideContainer mEndSideContainer;
+
     public PhoneStatusBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
@@ -124,6 +131,8 @@ public class PhoneStatusBarView extends FrameLayout {
     public void onFinishInflate() {
         super.onFinishInflate();
         mCutoutSpace = findViewById(R.id.cutout_space_view);
+        mStartSideContainer = findViewById(R.id.status_bar_start_side_container);
+        mEndSideContainer = findViewById(R.id.status_bar_end_side_container);
         // Let negative user paddings draw into the privacy dot / corner area.
         setClipToPadding(false);
 
@@ -361,10 +370,32 @@ public class PhoneStatusBarView extends FrameLayout {
         updateSafeInsets();
     }
 
+    /** Reserves room for the dynamic island so the side contents shrink instead of under it. */
+    public void setDynamicIslandWidth(int width) {
+        int reserved = width > 0
+                ? width + 2 * getResources().getDimensionPixelSize(
+                        R.dimen.status_bar_dynamic_island_side_margin)
+                : 0;
+        if (reserved == mDynamicIslandWidth) {
+            return;
+        }
+        mDynamicIslandWidth = reserved;
+        updateCutoutLocation();
+        requestLayout();
+    }
+
     private void updateCutoutLocation() {
         // Not all layouts have a cutout (e.g., Car)
         if (mCutoutSpace == null) {
             return;
+        }
+
+        boolean islandShown = mDynamicIslandWidth > 0;
+        if (mStartSideContainer != null) {
+            mStartSideContainer.setIslandActive(islandShown);
+        }
+        if (mEndSideContainer != null) {
+            mEndSideContainer.setIslandActive(islandShown);
         }
 
         boolean hasCornerCutout;
@@ -375,7 +406,9 @@ public class PhoneStatusBarView extends FrameLayout {
             hasCornerCutout = true;
         }
 
-        if (mDisplayCutout == null || mDisplayCutout.isEmpty() || hasCornerCutout) {
+        boolean centerCutout =
+                mDisplayCutout != null && !mDisplayCutout.isEmpty() && !hasCornerCutout;
+        if (!centerCutout && !islandShown) {
             mCutoutSpace.setVisibility(View.GONE);
             return;
         }
@@ -383,12 +416,18 @@ public class PhoneStatusBarView extends FrameLayout {
         mCutoutSpace.setVisibility(View.VISIBLE);
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) mCutoutSpace.getLayoutParams();
 
-        Rect bounds = mDisplayCutout.getBoundingRectTop();
+        int cutoutWidth = 0;
+        if (centerCutout) {
+            Rect bounds = mDisplayCutout.getBoundingRectTop();
 
-        bounds.left = bounds.left + mCutoutSideNudge;
-        bounds.right = bounds.right - mCutoutSideNudge;
-        lp.width = bounds.width();
-        lp.height = bounds.height();
+            bounds.left = bounds.left + mCutoutSideNudge;
+            bounds.right = bounds.right - mCutoutSideNudge;
+            cutoutWidth = bounds.width();
+            lp.height = bounds.height();
+        } else {
+            lp.height = LinearLayout.LayoutParams.MATCH_PARENT;
+        }
+        lp.width = Math.max(cutoutWidth, mDynamicIslandWidth);
     }
 
     private void updateSafeInsets() {
