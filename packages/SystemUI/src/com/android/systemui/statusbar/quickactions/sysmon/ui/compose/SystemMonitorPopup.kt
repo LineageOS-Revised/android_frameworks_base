@@ -166,13 +166,10 @@ private fun Sensors(stats: SystemStats) {
             label = "CPU",
             value = stats.cpuTemp?.let { "$it°C" } ?: "--",
         )
-        Sensor(
-            label = "GPU",
-            value =
-                listOfNotNull(stats.gpuLoad?.let { "$it%" }, stats.gpuMhz?.let { "${it}M" })
-                    .joinToString(" ")
-                    .ifEmpty { "--" },
-        )
+        val gpu =
+            listOfNotNull(stats.gpuLoad?.let { "$it%" }, stats.gpuMhz?.let { "${it}M" })
+                .joinToString(" ")
+        if (gpu.isNotEmpty()) Sensor(label = "GPU", value = gpu)
         Sensor(
             label = stringResource(R.string.system_monitor_battery),
             value =
