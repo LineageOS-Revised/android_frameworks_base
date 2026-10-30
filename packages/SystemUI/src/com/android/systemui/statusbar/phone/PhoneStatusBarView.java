@@ -381,7 +381,9 @@ public class PhoneStatusBarView extends FrameLayout {
         }
         mDynamicIslandWidth = reserved;
         updateCutoutLocation();
-        requestLayout();
+        if (mCutoutSpace != null) {
+            mCutoutSpace.requestLayout();
+        }
     }
 
     private void updateCutoutLocation() {

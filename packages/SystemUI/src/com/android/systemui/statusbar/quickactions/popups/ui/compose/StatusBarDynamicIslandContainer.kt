@@ -103,6 +103,7 @@ fun StatusBarDynamicIslandContainer(
     if (selectedChip == null) {
         return
     }
+    val shownChipId by rememberUpdatedState(selectedChip.chipId)
 
     fun selectRelative(direction: Int) {
         if (chips.size <= 1) return
@@ -168,7 +169,7 @@ fun StatusBarDynamicIslandContainer(
                 cutoutSpec = cutoutSpec,
                 onChipBoundsChanged = { bounds -> anchorBounds = bounds },
                 onReservedWidthChanged = { width ->
-                    if (chipId == selectedChipId) {
+                    if (chipId == shownChipId) {
                         onIslandWidthChanged(width + 2 * abs(cutoutOffsetPx))
                     }
                 },
