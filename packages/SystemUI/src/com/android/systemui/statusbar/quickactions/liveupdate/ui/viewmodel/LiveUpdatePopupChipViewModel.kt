@@ -34,6 +34,7 @@ import com.android.systemui.statusbar.notification.promoted.shared.model.Promote
 import com.android.systemui.statusbar.notification.shared.Metric
 import com.android.systemui.statusbar.notification.shared.NotificationChipFromCompactContent
 import com.android.systemui.statusbar.policy.KeyguardStateController
+import com.android.systemui.statusbar.quickactions.liveupdate.shared.isHandledAsDelivery
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdate
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdatePopupModel
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdateProgress
@@ -82,6 +83,7 @@ constructor(
     override fun parse(entry: NotificationEntry): LiveUpdate? {
         val content = entry.promotedNotificationContentModels?.privateVersion ?: return null
         if (content.style == Style.Call || content.style == Style.CollapsedCall) return null
+        if (entry.isHandledAsDelivery(context)) return null
 
         var shortText: String? = null
         var timer: LiveUpdateTimer? = null

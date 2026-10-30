@@ -19,6 +19,8 @@ package com.android.systemui.statusbar.quickactions.liveupdate.shared
 import android.content.Context
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel.Style
+import com.android.systemui.statusbar.quickactions.delivery.domain.DeliveryParser
+import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.DELIVERY
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.LIVE_UPDATES
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.readDynamicIslandFeatureEnabled
 
@@ -26,5 +28,11 @@ import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFe
 fun NotificationEntry.isShownAsLiveUpdate(context: Context): Boolean {
     val style = promotedNotificationContentModels?.privateVersion?.style ?: return false
     if (style == Style.Call || style == Style.CollapsedCall) return false
+    if (isHandledAsDelivery(context)) return false
     return context.contentResolver.readDynamicIslandFeatureEnabled(LIVE_UPDATES)
 }
+
+/** Delivery apps keep the delivery chip, which knows about ETAs and order stages. */
+fun NotificationEntry.isHandledAsDelivery(context: Context): Boolean =
+    DeliveryParser.isDeliveryApp(sbn.packageName) &&
+        context.contentResolver.readDynamicIslandFeatureEnabled(DELIVERY)
