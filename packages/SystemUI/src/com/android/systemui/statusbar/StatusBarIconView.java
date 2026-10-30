@@ -113,6 +113,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
 
     private static final String TAG = "StatusBarIconView";
     private static final String STATUSBAR_COLORED_ICONS = "statusbar_colored_icons";
+    private static final String STATUSBAR_NOTIF_COUNT = "statusbar_notif_count";
     private static final Property<StatusBarIconView, Float> ICON_APPEAR_AMOUNT
             = new FloatProperty<StatusBarIconView>("iconAppearAmount") {
 
@@ -156,6 +157,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
     private boolean mNightMode;
     private float mIconScale = 1.0f;
     private final Paint mDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mNumberPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float mDotRadius;
     private int mStaticDotRadius;
     @StatusBarIconView.VisibleState
@@ -184,9 +186,10 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
     private boolean mIncreasedSize;
     private boolean mShowsConversation;
     private boolean mColoredIcon;
+    private boolean mShowNotifCount;
     private float mDozeAmount;
     private final NotificationDozeHelper mDozer;
-    private final ContentObserver mColoredIconsObserver;
+    private final ContentObserver mSettingsObserver;
 
     public StatusBarIconView(Context context, String slot, StatusBarNotification sbn) {
         this(context, slot, sbn, false);
@@ -202,10 +205,11 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
             boolean blocked) {
         super(context);
         mDozer = new NotificationDozeHelper();
-        mColoredIconsObserver = new ContentObserver(context.getMainThreadHandler()) {
+        mSettingsObserver = new ContentObserver(context.getMainThreadHandler()) {
             @Override
             public void onChange(boolean selfChange) {
                 updateColoredIcon();
+                updateNotifCount();
             }
         };
         mBlocked = blocked;
@@ -415,21 +419,34 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
         updateIconColor();
     }
 
+    private void updateNotifCount() {
+        final boolean show = Settings.System.getIntForUser(mContext.getContentResolver(),
+                STATUSBAR_NOTIF_COUNT, 0, UserHandle.USER_CURRENT) != 0;
+        if (mShowNotifCount != show) {
+            mShowNotifCount = show;
+            invalidate();
+        }
+    }
+
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (isNotification()) {
             mContext.getContentResolver().registerContentObserver(
                     Settings.System.getUriFor(STATUSBAR_COLORED_ICONS), false,
-                    mColoredIconsObserver, UserHandle.USER_ALL);
+                    mSettingsObserver, UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.System.getUriFor(STATUSBAR_NOTIF_COUNT), false,
+                    mSettingsObserver, UserHandle.USER_ALL);
             updateColoredIcon();
+            updateNotifCount();
         }
     }
 
     @Override
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mContext.getContentResolver().unregisterContentObserver(mColoredIconsObserver);
+        mContext.getContentResolver().unregisterContentObserver(mSettingsObserver);
     }
 
     private boolean isShownWithNotifications() {
@@ -458,6 +475,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
                 && mIcon.iconLevel == icon.iconLevel;
         final boolean visibilityEquals = mIcon != null
                 && mIcon.visible == icon.visible;
+        final boolean numberEquals = mIcon != null && mIcon.number == icon.number;
         mIcon = icon.clone();
         setContentDescription(icon.contentDescription);
         if (!iconEquals) {
@@ -475,6 +493,9 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
         }
         if (!visibilityEquals) {
             setVisibility(icon.visible && !mBlocked ? VISIBLE : GONE);
+        }
+        if (!numberEquals) {
+            invalidate();
         }
         return true;
     }
@@ -638,6 +659,23 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
                     (float) px, (float) py);
             super.onDraw(canvas);
             canvas.restore();
+
+            if (mShowNotifCount && isNotification() && mIcon != null && mIcon.number > 0) {
+                float size = mStatusBarIconDrawingSize * mIconScale * mIconAppearAmount;
+                float radius = size * 0.3f;
+                float cx = px + size / 2f - radius / 2f;
+                float cy = py + size / 2f - radius / 2f;
+                mNumberPaint.setColor(mDecorColor);
+                canvas.drawCircle(cx, cy, radius, mNumberPaint);
+                mNumberPaint.setColor(ColorUtils.calculateLuminance(mDecorColor) > 0.5
+                        ? Color.BLACK : Color.WHITE);
+                mNumberPaint.setTextSize(radius * 1.3f);
+                mNumberPaint.setTextAlign(Paint.Align.CENTER);
+                mNumberPaint.setFakeBoldText(true);
+                canvas.drawText(String.valueOf(Math.min(mIcon.number, 99)), cx,
+                        cy - (mNumberPaint.descent() + mNumberPaint.ascent()) / 2f,
+                        mNumberPaint);
+            }
         }
 
         if (mDotAppearAmount != 0.0f) {
