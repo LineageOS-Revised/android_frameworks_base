@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -56,13 +55,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.android.systemui.common.ui.compose.Icon
@@ -105,37 +105,26 @@ fun StatusBarDynamicIslandChip(
             colorScheme = MaterialTheme.colorScheme,
         )
     val view = LocalView.current
-    val split = remember { CutoutSplit() }
     val boundsModifier =
         Modifier.onGloballyPositioned { coordinates ->
             onChipBoundsChanged(coordinates.boundsInScreen(view))
-            onReservedWidthChanged(coordinates.size.width + 2 * abs(split.shiftPx))
-        }
-    // Moves the chip sideways so the gap left for the camera sits right over the cutout. Room
-    // is kept on both sides so the island view stays centered and nothing gets clipped.
-    val cutoutAlignModifier =
-        Modifier.layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            val shift = split.shiftPx
-            layout(placeable.width + 2 * abs(shift), placeable.height) {
-                placeable.place(abs(shift) + shift, 0)
-            }
+            onReservedWidthChanged(coordinates.size.width)
         }
     if (viewModel.popupContent.isUtilityStatusContent() && viewModel.icons.isNotEmpty()) {
         UtilityStatusIslandChip(
             viewModel = viewModel,
             onTap = onTap,
             cutoutSpec = cutoutSpec,
-            split = split,
             chipBackgroundColor = chipBackgroundColor,
             chipContentColor = chipContentColor,
             chipOutline = chipOutline,
-            modifier = modifier.then(cutoutAlignModifier).then(boundsModifier),
+            modifier = modifier.then(boundsModifier),
         )
         return
     }
 
-    val cutoutGap = if (cutoutSpec.hasCutout) cutoutSpec.embeddedGapWidth else 0.dp
+    val hasCutout = cutoutSpec.hasCutout
+    val cutoutGap = if (hasCutout) cutoutSpec.embeddedGapWidth else 0.dp
     val compactWidth = compactIslandWidthFor(viewModel.popupContent)?.plus(cutoutGap)
     val hasInlineTimer = viewModel.popupContent is PopupContentModel.Stopwatch
     val trailingDecorationWidth =
@@ -163,6 +152,44 @@ fun StatusBarDynamicIslandChip(
         (CompactIslandMaxWidth - 24.dp - leadingDecorationWidth - trailingDecorationWidth)
             .coerceAtLeast(56.dp)
 
+    val chipText =
+        viewModel.chipText?.takeIf {
+            !isMediaChip &&
+                viewModel.popupContent !is PopupContentModel.ScreenRecord &&
+                !hasInlineTimer &&
+                it.isNotBlank()
+        }
+    val textStyle = MaterialTheme.typography.labelLarge
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val (leftText, rightText) =
+        remember(chipText, hasCutout, textStyle, leadingDecorationWidth, trailingDecorationWidth) {
+            if (chipText == null || !hasCutout) {
+                null to chipText
+            } else {
+                with(density) {
+                    splitAroundCutout(
+                        text = chipText,
+                        leadingPx = leadingDecorationWidth.roundToPx(),
+                        trailingPx = trailingDecorationWidth.roundToPx(),
+                        spacingPx = 8.dp.roundToPx(),
+                        measure = { textMeasurer.measure(it, textStyle).size.width },
+                    )
+                }
+            }
+        }
+
+    val chipLabel: @Composable (String) -> Unit = { text ->
+        Text(
+            text = text,
+            style = textStyle,
+            color = chipContentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = maxTextWidth),
+        )
+    }
+
     val leading: @Composable () -> Unit = {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -189,6 +216,7 @@ fun StatusBarDynamicIslandChip(
                     tint = if (isArtworkLike) Color.Unspecified else chipContentColor,
                 )
             }
+            leftText?.let { chipLabel(it) }
         }
     }
 
@@ -197,23 +225,7 @@ fun StatusBarDynamicIslandChip(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            viewModel.chipText
-                ?.takeIf {
-                    !isMediaChip &&
-                        viewModel.popupContent !is PopupContentModel.ScreenRecord &&
-                        !hasInlineTimer &&
-                        it.isNotBlank()
-                }
-                ?.let { text ->
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = chipContentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = maxTextWidth),
-                    )
-                }
+            rightText?.let { chipLabel(it) }
 
             when (val popupContent = viewModel.popupContent) {
                 is PopupContentModel.Media ->
@@ -267,12 +279,10 @@ fun StatusBarDynamicIslandChip(
         }
     }
 
-    val hasCutout = cutoutSpec.hasCutout
     Layout(
         contents = listOf(leading, trailing),
         modifier =
             modifier
-                .then(cutoutAlignModifier)
                 .then(boundsModifier)
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
@@ -286,64 +296,96 @@ fun StatusBarDynamicIslandChip(
                 .clickable(onClick = onTap)
                 .padding(horizontal = 12.dp, vertical = 7.dp),
     ) { (leadingMeasurables, trailingMeasurables), constraints ->
-        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val gap = if (hasCutout) cutoutGap.roundToPx() else 0
+        val spacing = if (hasCutout) 0 else 8.dp.roundToPx()
+        val sideMax =
+            if (hasCutout) ((constraints.maxWidth - gap) / 2).coerceAtLeast(0)
+            else constraints.maxWidth
+        val loose = Constraints(maxWidth = sideMax, maxHeight = constraints.maxHeight)
         val left = leadingMeasurables.map { it.measure(loose) }
         val leftWidth = left.maxOfOrNull { it.width } ?: 0
-        val hasLeft = viewModel.icons.isNotEmpty()
-        val spacing =
-            when {
-                hasCutout -> cutoutGap.roundToPx()
-                hasLeft -> 8.dp.roundToPx()
-                else -> 0
+        val usedSpacing = if (leftWidth > 0) spacing else 0
+        val right =
+            trailingMeasurables.map {
+                it.measure(
+                    loose.copy(
+                        maxWidth =
+                            if (hasCutout) sideMax
+                            else (sideMax - leftWidth - usedSpacing).coerceAtLeast(0)
+                    )
+                )
             }
-        val usedLeft = if (hasLeft) leftWidth else 0
-        val rightConstraints =
-            loose.copy(maxWidth = (constraints.maxWidth - usedLeft - spacing).coerceAtLeast(0))
-        val right = trailingMeasurables.map { it.measure(rightConstraints) }
         val rightWidth = right.maxOfOrNull { it.width } ?: 0
-        val width =
-            (usedLeft + spacing + rightWidth).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val contentWidth =
+            if (hasCutout) 2 * maxOf(leftWidth, rightWidth) + gap
+            else leftWidth + usedSpacing + rightWidth
+        val width = contentWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
         val height =
             maxOf(left.maxOfOrNull { it.height } ?: 0, right.maxOfOrNull { it.height } ?: 0)
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
-        split.shiftPx = if (hasCutout) (rightWidth - usedLeft) / 2 else 0
         layout(width, height) {
-            if (hasLeft) left.forEach { it.place(0, (height - it.height) / 2) }
-            right.forEach { it.place(width - rightWidth, (height - it.height) / 2) }
+            val rightX =
+                if (hasCutout || compactWidth != null) width - rightWidth
+                else leftWidth + usedSpacing
+            left.forEach { it.place(0, (height - it.height) / 2) }
+            right.forEach { it.place(rightX, (height - it.height) / 2) }
         }
     }
 }
 
-/** Sideways shift that puts the chip's camera gap over the cutout. */
-private class CutoutSplit {
-    var shiftPx by mutableIntStateOf(0)
+/**
+ * Splits [text] into a part shown left of the camera and a part shown right of it, so both sides
+ * of the island end up about equally wide. Prefers splitting at " · ", else at a space.
+ */
+private fun splitAroundCutout(
+    text: String,
+    leadingPx: Int,
+    trailingPx: Int,
+    spacingPx: Int,
+    measure: (String) -> Int,
+): Pair<String?, String?> {
+    val separator = if (text.contains(DotSeparator)) DotSeparator else " "
+    val candidates = mutableListOf<Pair<String?, String?>>(null to text, text to null)
+    var index = text.indexOf(separator)
+    while (index >= 0) {
+        val before = text.substring(0, index).trim()
+        val after = text.substring(index + separator.length).trim()
+        if (before.isNotEmpty() && after.isNotEmpty()) candidates += before to after
+        index = text.indexOf(separator, index + separator.length)
+    }
+
+    fun sideWidth(part: String?, decorationPx: Int): Int {
+        val textPx = part?.let(measure) ?: 0
+        return when {
+            textPx == 0 -> decorationPx
+            decorationPx == 0 -> textPx
+            else -> textPx + spacingPx + decorationPx
+        }
+    }
+
+    return candidates.minBy { (before, after) ->
+        abs(sideWidth(before, leadingPx) - sideWidth(after, trailingPx))
+    }
 }
+
+private const val DotSeparator = " · "
 
 @Composable
 private fun UtilityStatusIslandChip(
     viewModel: PopupChipModel.Shown,
     onTap: () -> Unit,
     cutoutSpec: DynamicIslandCutoutSpec,
-    split: CutoutSplit,
     chipBackgroundColor: Color,
     chipContentColor: Color,
     chipOutline: Color,
     modifier: Modifier = Modifier,
 ) {
-    val rightSegmentWidth =
+    // Both halves are equally wide so the gap in the middle sits over the camera.
+    val halfWidth =
         when (viewModel.popupContent) {
-            is PopupContentModel.Flashlight -> 52.dp
-            is PopupContentModel.Alarm -> 72.dp
-            else -> 80.dp
+            is PopupContentModel.Flashlight -> 48.dp
+            else -> 68.dp
         }
-    val connectedIslandWidth =
-        (CompactUtilityConnectedIslandChromeWidth +
-                cutoutSpec.embeddedGapWidth +
-                rightSegmentWidth)
-            .coerceIn(
-                CompactUtilityConnectedIslandMinWidth,
-                CompactUtilityConnectedIslandMaxWidth,
-            )
     val utilityText =
         when (val popupContent = viewModel.popupContent) {
             is PopupContentModel.ScreenRecord ->
@@ -363,22 +405,8 @@ private fun UtilityStatusIslandChip(
     Row(
         modifier =
             modifier
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints)
-                    // Icon side is 10dp + 16dp icon; everything after the gap is the other side.
-                    val iconSide = 26.dp.roundToPx()
-                    val gap = cutoutSpec.embeddedGapWidth.roundToPx()
-                    split.shiftPx =
-                        if (cutoutSpec.hasCutout) {
-                            (placeable.width - gap - 2 * iconSide) / 2
-                        } else {
-                            0
-                        }
-                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                }
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
-                .width(connectedIslandWidth)
                 .clip(RoundedCornerShape(50))
                 .background(chipBackgroundColor)
                 .border(width = 1.dp, color = chipOutline, shape = RoundedCornerShape(50))
@@ -386,17 +414,21 @@ private fun UtilityStatusIslandChip(
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(modifier = Modifier.width(10.dp))
-        Icon(
-            icon = viewModel.icons.first().icon,
-            modifier = Modifier.size(16.dp),
-            tint = chipContentColor,
-        )
+        Box(
+            modifier = Modifier.width(halfWidth).padding(horizontal = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Icon(
+                icon = viewModel.icons.first().icon,
+                modifier = Modifier.size(16.dp),
+                tint = chipContentColor,
+            )
+        }
         Spacer(modifier = Modifier.width(cutoutSpec.embeddedGapWidth))
         Box(
             modifier =
-                Modifier.width(rightSegmentWidth)
-                    .padding(start = 6.dp, top = 7.dp, bottom = 7.dp, end = 6.dp),
+                Modifier.width(halfWidth)
+                    .padding(start = 6.dp, top = 7.dp, bottom = 7.dp, end = 10.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
             Text(
@@ -409,7 +441,6 @@ private fun UtilityStatusIslandChip(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Spacer(modifier = Modifier.width(10.dp))
     }
 }
 
@@ -456,13 +487,10 @@ private val CompactTimerIslandWidth = 116.dp
 private val CompactRecordingIslandWidth = 88.dp
 private val CompactAlarmIslandWidth = 92.dp
 private val CompactUtilityIslandWidth = 74.dp
-private val CompactUtilityConnectedIslandChromeWidth = 42.dp
-private val CompactUtilityConnectedIslandMinWidth = 132.dp
-private val CompactUtilityConnectedIslandMaxWidth = 188.dp
 private val DynamicIslandEmbeddedGapFallbackWidth = 38.dp
 private val DynamicIslandEmbeddedGapMinWidth = 34.dp
 private val DynamicIslandEmbeddedGapMaxWidth = 88.dp
-private val DynamicIslandEmbeddedGapSidePadding = 10.dp
+private val DynamicIslandEmbeddedGapSidePadding = 6.dp
 
 data class DynamicIslandCutoutSpec(
     val embeddedGapWidth: Dp,
