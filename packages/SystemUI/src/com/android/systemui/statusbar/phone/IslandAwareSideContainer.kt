@@ -20,6 +20,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 
 /**
@@ -42,6 +43,9 @@ constructor(context: Context, attrs: AttributeSet? = null) : FrameLayout(context
         val content = singleVisibleChild()
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val available = width - paddingLeft - paddingRight
+        // The content gets measured at changing widths. Skip the measure cache, otherwise views
+        // like StatusIconContainer keep their overflow decision from an earlier width.
+        content?.let(::forceLayoutTree)
         if (
             !isIslandActive ||
                 content == null ||
@@ -53,18 +57,21 @@ constructor(context: Context, attrs: AttributeSet? = null) : FrameLayout(context
             return
         }
 
-        super.onMeasure(widthSpecFor(available / MIN_SCALE), heightMeasureSpec)
-        val natural = content.measuredWidth
-        if (natural <= available) {
-            content.setContentScale(1f)
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            return
-        }
-
-        val scale = (available.toFloat() / natural).coerceAtLeast(MIN_SCALE)
-        super.onMeasure(widthSpecFor(available / scale), heightMeasureSpec)
+        // One measure with room for the smallest scale: content that fits is measured as it
+        // would be at full size, content that doesn't gets shrunk to fit.
+        super.onMeasure(
+            MeasureSpec.makeMeasureSpec(
+                (available / MIN_SCALE).toInt() + paddingLeft + paddingRight,
+                MeasureSpec.EXACTLY,
+            ),
+            heightMeasureSpec,
+        )
         setMeasuredDimension(width, measuredHeight)
-        content.setContentScale(scale)
+        val natural = content.measuredWidth
+        content.setContentScale(
+            if (natural <= available) 1f
+            else (available.toFloat() / natural).coerceAtLeast(MIN_SCALE)
+        )
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -80,11 +87,12 @@ constructor(context: Context, attrs: AttributeSet? = null) : FrameLayout(context
         content.pivotY = content.height / 2f
     }
 
-    private fun widthSpecFor(contentWidth: Float): Int =
-        MeasureSpec.makeMeasureSpec(
-            contentWidth.toInt() + paddingLeft + paddingRight,
-            MeasureSpec.EXACTLY,
-        )
+    private fun forceLayoutTree(view: View) {
+        view.forceLayout()
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) forceLayoutTree(view.getChildAt(i))
+        }
+    }
 
     private fun singleVisibleChild(): View? {
         var found: View? = null
