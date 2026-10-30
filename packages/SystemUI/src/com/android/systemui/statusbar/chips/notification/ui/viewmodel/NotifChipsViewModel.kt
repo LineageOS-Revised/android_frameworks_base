@@ -54,6 +54,8 @@ import com.android.systemui.statusbar.notification.domain.model.TopPinnedState
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.statusbar.notification.shared.Metric
 import com.android.systemui.statusbar.notification.shared.NotificationChipFromCompactContent
+import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.LIVE_UPDATES
+import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.observeDynamicIslandFeatureEnabled
 import com.android.systemui.util.kotlin.pairwise
 import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
@@ -64,6 +66,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import lineageos.providers.LineageSettings
 
 /** A view model for status bar chips for promoted ongoing notifications. */
 @SysUISingleton
@@ -79,6 +82,20 @@ constructor(
     @StatusBarChipsLog private val logBuffer: LogBuffer,
 ) {
     private val logger = Logger(logBuffer, "NotifChipVM".pad())
+
+    /** Live Updates move into the dynamic island when it is on, so they get no chip here. */
+    private val isIslandShowingLiveUpdates: Flow<Boolean> =
+        combine(
+                observeDynamicIslandFeatureEnabled(
+                    context,
+                    LineageSettings.System.STATUS_BAR_SHOW_DYNAMIC_ISLAND,
+                    defaultValue = false,
+                ),
+                observeDynamicIslandFeatureEnabled(context, LIVE_UPDATES),
+            ) { island, liveUpdates ->
+                island && liveUpdates
+            }
+            .distinctUntilChanged()
 
     // Since we're combining the chip state and the transition state flows, getting the old value by
     // using [pairwise()] would confuse things. This is because if the calculation is triggered by
@@ -107,7 +124,11 @@ constructor(
      * each status bar chip needs.
      */
     private val notificationChipsWithPrunedContent: Flow<List<PrunedNotificationChipModel>> =
-        notifChipsInteractor.allNotificationChips
+        combine(notifChipsInteractor.allNotificationChips, isIslandShowingLiveUpdates) {
+                chips,
+                islandShowsThem ->
+                if (islandShowsThem) chips.filterNot { it.isShownInIsland() } else chips
+            }
             .pairwise(initialValue = emptyList())
             .map { (oldChips, currentChips) ->
                 if (StatusBarChipsReturnAnimations.isEnabled) {
@@ -133,6 +154,12 @@ constructor(
      */
     private fun List<NotificationChipModel>.filterByPackage(): List<NotificationChipModel> {
         return this.groupBy { it.packageName }.map { (_, chips) -> chips[0] }
+    }
+
+    private fun NotificationChipModel.isShownInIsland(): Boolean {
+        val style = promotedContent.privateVersion.style
+        return style != PromotedNotificationContentModel.Style.Call &&
+            style != PromotedNotificationContentModel.Style.CollapsedCall
     }
 
     private fun NotificationChipModel.toPrunedModel(): PrunedNotificationChipModel {

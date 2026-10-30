@@ -41,6 +41,25 @@ fun rememberElapsedDurationText(baseElapsedRealtimeMs: Long): String {
     return formatElapsedDuration(elapsedSeconds)
 }
 
+/** Like [rememberElapsedDurationText], but counts down to [baseElapsedRealtimeMs] if asked. */
+@Composable
+fun rememberChronometerText(baseElapsedRealtimeMs: Long, isCountDown: Boolean): String {
+    if (!isCountDown) return rememberElapsedDurationText(baseElapsedRealtimeMs)
+    var now by remember(baseElapsedRealtimeMs) {
+        mutableLongStateOf(android.os.SystemClock.elapsedRealtime())
+    }
+
+    LaunchedEffect(baseElapsedRealtimeMs) {
+        while (true) {
+            now = android.os.SystemClock.elapsedRealtime()
+            delay(1000L)
+        }
+    }
+
+    val remainingSeconds = ((baseElapsedRealtimeMs - now).coerceAtLeast(0L) + 999L) / 1000L
+    return formatElapsedDuration(remainingSeconds)
+}
+
 private fun formatElapsedDuration(totalSeconds: Long): String {
     val hours = totalSeconds / 3600L
     val minutes = (totalSeconds % 3600L) / 60L

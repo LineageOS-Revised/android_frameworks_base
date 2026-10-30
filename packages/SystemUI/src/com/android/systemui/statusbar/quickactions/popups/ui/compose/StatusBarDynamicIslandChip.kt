@@ -201,7 +201,8 @@ fun StatusBarDynamicIslandChip(
                         (viewModel.popupContent is PopupContentModel.Media ||
                             viewModel.popupContent is PopupContentModel.LiveScore ||
                             viewModel.popupContent is PopupContentModel.Delivery ||
-                            viewModel.popupContent is PopupContentModel.Transfer)
+                            viewModel.popupContent is PopupContentModel.Transfer ||
+                            viewModel.popupContent is PopupContentModel.LiveUpdate)
                 Icon(
                     icon = chipIcon.icon,
                     modifier = Modifier
@@ -270,6 +271,22 @@ fun StatusBarDynamicIslandChip(
                         strokeWidth = 2.dp,
                         trackColor = chipContentColor.copy(alpha = 0.24f),
                     )
+                is PopupContentModel.LiveUpdate -> {
+                    val timer = popupContent.model.update.timer
+                    if (timer != null && viewModel.chipText == null) {
+                        StatusContent(
+                            text =
+                                rememberChronometerText(
+                                    timer.baseElapsedRealtimeMs,
+                                    timer.isCountDown,
+                                ),
+                            color = chipContentColor,
+                            showSwipeHint = pageCount > 1,
+                        )
+                    } else if (pageCount > 1) {
+                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
+                    }
+                }
                 else -> {
                     if (pageCount > 1) {
                         SwipeHint(color = chipContentColor.copy(alpha = 0.72f))

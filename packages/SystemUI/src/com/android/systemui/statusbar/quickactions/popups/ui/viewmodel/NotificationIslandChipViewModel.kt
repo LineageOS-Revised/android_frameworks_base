@@ -34,6 +34,7 @@ import com.android.systemui.statusbar.notification.collection.notifcollection.No
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationModel
 import com.android.systemui.statusbar.policy.KeyguardStateController
+import com.android.systemui.statusbar.quickactions.liveupdate.shared.isShownAsLiveUpdate
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.observeDynamicIslandFeatureEnabled
 import com.android.systemui.statusbar.quickactions.popups.shared.toActivityLaunchAction
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
@@ -64,6 +65,7 @@ abstract class NotificationIslandChipViewModel<T : Any>(
     private val keyguardStateController: KeyguardStateController,
     private val settingKey: String,
     private val chipId: PopupChipId,
+    private val skipLiveUpdates: Boolean = true,
 ) : DynamicIslandChipViewModel, ExclusiveActivatable() {
 
     data class Item<T>(
@@ -97,7 +99,10 @@ abstract class NotificationIslandChipViewModel<T : Any>(
 
                 fun update(entry: NotificationEntry): Boolean {
                     val value =
-                        if (entry.sbn.notification?.isGroupSummary == false) {
+                        if (
+                            entry.sbn.notification?.isGroupSummary == false &&
+                                !(skipLiveUpdates && entry.isShownAsLiveUpdate(context))
+                        ) {
                             try {
                                 parse(entry)
                             } catch (e: RuntimeException) {

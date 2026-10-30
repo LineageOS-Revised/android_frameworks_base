@@ -40,6 +40,7 @@ import com.android.systemui.statusbar.quickactions.livescore.domain.LiveScoreInp
 import com.android.systemui.statusbar.quickactions.livescore.domain.LiveScoreParser
 import com.android.systemui.statusbar.quickactions.livescore.domain.ParsedLiveScore
 import com.android.systemui.statusbar.quickactions.livescore.shared.model.LiveScoreChipModel
+import com.android.systemui.statusbar.quickactions.liveupdate.shared.isShownAsLiveUpdate
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.LIVE_SCORES
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.observeDynamicIslandFeatureEnabled
 import com.android.systemui.statusbar.quickactions.popups.shared.toActivityLaunchAction
@@ -291,7 +292,7 @@ constructor(
 
     private fun NotificationEntry.toScoredNotification(): ScoredNotification? {
         val notification = sbn.notification ?: return null
-        if (notification.isGroupSummary) {
+        if (notification.isGroupSummary || isShownAsLiveUpdate(context)) {
             return null
         }
         val extras = notification.extras

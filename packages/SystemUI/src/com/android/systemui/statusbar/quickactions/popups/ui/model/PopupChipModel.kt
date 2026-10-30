@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.popups.ui.model
 
+import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdatePopupModel
 import com.android.systemui.statusbar.quickactions.alarm.shared.model.AlarmPopupModel
 import com.android.systemui.statusbar.quickactions.flashlight.shared.model.FlashlightPopupModel
 import com.android.systemui.common.shared.model.Icon
@@ -43,6 +44,8 @@ sealed class PopupChipId(val value: String) {
     data object Transfer : PopupChipId("Transfer")
 
     data object SystemMonitor : PopupChipId("SystemMonitor")
+
+    data object LiveUpdate : PopupChipId("LiveUpdate")
 
     data object Flashlight : PopupChipId("Flashlight")
 
@@ -82,6 +85,8 @@ sealed interface PopupContentModel {
     data class Transfer(val model: TransferChipModel) : PopupContentModel
 
     data class SystemMonitor(val model: SystemMonitorPopupModel) : PopupContentModel
+
+    data class LiveUpdate(val model: LiveUpdatePopupModel) : PopupContentModel
 
     data class Flashlight(val model: FlashlightPopupModel) : PopupContentModel
 

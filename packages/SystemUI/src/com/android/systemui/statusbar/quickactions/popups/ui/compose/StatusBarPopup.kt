@@ -64,6 +64,7 @@ import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupContentM
 import com.android.systemui.statusbar.quickactions.screenrecord.ui.compose.ScreenRecordPopup
 import com.android.systemui.statusbar.quickactions.stopwatch.ui.compose.StopwatchPopup
 import com.android.systemui.statusbar.quickactions.sysmon.ui.compose.SystemMonitorPopup
+import com.android.systemui.statusbar.quickactions.liveupdate.ui.compose.LiveUpdatePopup
 import com.android.systemui.statusbar.quickactions.transfer.ui.compose.TransferPopup
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -262,6 +263,7 @@ fun StatusBarPopup(
                     is PopupContentModel.Transfer -> TransferPopup(model = popupContent.model)
                     is PopupContentModel.SystemMonitor ->
                         SystemMonitorPopup(model = popupContent.model)
+                    is PopupContentModel.LiveUpdate -> LiveUpdatePopup(model = popupContent.model)
                     is PopupContentModel.Flashlight -> FlashlightPopup(model = popupContent.model)
                     is PopupContentModel.Stopwatch -> StopwatchPopup(model = popupContent.model)
                     is PopupContentModel.Alarm -> AlarmPopup(model = popupContent.model)

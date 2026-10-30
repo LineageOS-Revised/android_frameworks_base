@@ -34,6 +34,7 @@ import com.android.systemui.statusbar.quickactions.alarm.ui.viewmodel.AlarmPopup
 import com.android.systemui.statusbar.quickactions.flashlight.ui.viewmodel.FlashlightPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.delivery.ui.viewmodel.DeliveryPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.livescore.ui.viewmodel.LiveScorePopupChipViewModel
+import com.android.systemui.statusbar.quickactions.liveupdate.ui.viewmodel.LiveUpdatePopupChipViewModel
 import com.android.systemui.statusbar.quickactions.sysmon.data.SystemMonitorRepository
 import com.android.systemui.statusbar.quickactions.sysmon.ui.viewmodel.SystemMonitorPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.transfer.ui.viewmodel.TransferPopupChipViewModel
@@ -64,6 +65,7 @@ constructor(
     liveScoreChipFactory: LiveScorePopupChipViewModel.Factory,
     deliveryChipFactory: DeliveryPopupChipViewModel.Factory,
     transferChipFactory: TransferPopupChipViewModel.Factory,
+    liveUpdateChipFactory: LiveUpdatePopupChipViewModel.Factory,
     systemMonitorChipFactory: SystemMonitorPopupChipViewModel.Factory,
     private val systemMonitorRepository: SystemMonitorRepository,
     flashlightChipFactory: FlashlightPopupChipViewModel.Factory,
@@ -76,6 +78,7 @@ constructor(
     private val liveScoreChip by lazy { liveScoreChipFactory.create() }
     private val deliveryChip by lazy { deliveryChipFactory.create() }
     private val transferChip by lazy { transferChipFactory.create() }
+    private val liveUpdateChip by lazy { liveUpdateChipFactory.create() }
     private val systemMonitorChip by lazy { systemMonitorChipFactory.create() }
     private val flashlightChip by lazy { flashlightChipFactory.create() }
     private val stopwatchChip by lazy { stopwatchChipFactory.create() }
@@ -115,6 +118,7 @@ constructor(
                 liveScore = liveScoreChip.chip,
                 delivery = deliveryChip.chip,
                 transfer = transferChip.chip,
+                liveUpdate = liveUpdateChip.chip,
                 systemMonitor = systemMonitorChip.chip,
                 flashlight = flashlightChip.chip,
                 stopwatch = stopwatchChip.chip,
@@ -132,6 +136,7 @@ constructor(
             val candidateChips =
                 listOfNotNull(
                     bundle.media,
+                    bundle.liveUpdate,
                     bundle.systemMonitor,
                     bundle.screenRecord,
                     bundle.delivery,
@@ -171,6 +176,7 @@ constructor(
             launch { liveScoreChip.activate() }
             launch { deliveryChip.activate() }
             launch { transferChip.activate() }
+            launch { liveUpdateChip.activate() }
             launch { systemMonitorChip.activate() }
             launch {
                 systemMonitorRepository.isOpen.collect { open ->
@@ -195,6 +201,7 @@ constructor(
         val liveScore: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.LiveScore),
         val delivery: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Delivery),
         val transfer: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Transfer),
+        val liveUpdate: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.LiveUpdate),
         val systemMonitor: PopupChipModel =
             PopupChipModel.Hidden(chipId = PopupChipId.SystemMonitor),
         val flashlight: PopupChipModel = PopupChipModel.Hidden(chipId = PopupChipId.Flashlight),
