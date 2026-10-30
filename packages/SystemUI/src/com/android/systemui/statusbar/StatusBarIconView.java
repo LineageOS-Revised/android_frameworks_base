@@ -29,6 +29,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorMatrixColorFilter;
@@ -39,6 +40,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.util.FloatProperty;
@@ -110,6 +112,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
     }
 
     private static final String TAG = "StatusBarIconView";
+    private static final String STATUSBAR_COLORED_ICONS = "statusbar_colored_icons";
     private static final Property<StatusBarIconView, Float> ICON_APPEAR_AMOUNT
             = new FloatProperty<StatusBarIconView>("iconAppearAmount") {
 
@@ -180,8 +183,10 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
     private Runnable mLayoutRunnable;
     private boolean mIncreasedSize;
     private boolean mShowsConversation;
+    private boolean mColoredIcon;
     private float mDozeAmount;
     private final NotificationDozeHelper mDozer;
+    private final ContentObserver mColoredIconsObserver;
 
     public StatusBarIconView(Context context, String slot, StatusBarNotification sbn) {
         this(context, slot, sbn, false);
@@ -197,6 +202,12 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
             boolean blocked) {
         super(context);
         mDozer = new NotificationDozeHelper();
+        mColoredIconsObserver = new ContentObserver(context.getMainThreadHandler()) {
+            @Override
+            public void onChange(boolean selfChange) {
+                updateColoredIcon();
+            }
+        };
         mBlocked = blocked;
         mSlot = slot;
         setNotification(sbn);
@@ -383,6 +394,44 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
         return mNotification != null;
     }
 
+    private boolean useAppIcon() {
+        if (!isNotification() || mShowsConversation || mIncreasedSize) {
+            return false;
+        }
+        final String pkg = mNotification.getPackageName();
+        return !"android".equals(pkg) && !mContext.getPackageName().equals(pkg)
+                && Settings.System.getIntForUser(mContext.getContentResolver(),
+                        STATUSBAR_COLORED_ICONS, 0, UserHandle.USER_CURRENT) != 0;
+    }
+
+    private void updateColoredIcon() {
+        if (mIcon == null || useAppIcon() == mColoredIcon) {
+            return;
+        }
+        if (updateDrawable(true)) {
+            setTag(R.id.icon_is_grayscale, null);
+            maybeUpdateIconScaleDimens();
+        }
+        updateIconColor();
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (isNotification()) {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.System.getUriFor(STATUSBAR_COLORED_ICONS), false,
+                    mColoredIconsObserver, UserHandle.USER_ALL);
+            updateColoredIcon();
+        }
+    }
+
+    @Override
+    public void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mContext.getContentResolver().unregisterContentObserver(mColoredIconsObserver);
+    }
+
     private boolean isShownWithNotifications() {
         return mNotification != null || mBundleEntry != null;
     }
@@ -484,7 +533,10 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
      */
     private Drawable getIcon(Context sysuiContext,
             Context context, StatusBarIcon statusBarIcon) {
-        Drawable icon = loadDrawable(context, statusBarIcon);
+        mColoredIcon = context != sysuiContext && useAppIcon();
+        Drawable icon = mColoredIcon
+                ? context.getApplicationInfo().loadIcon(context.getPackageManager())
+                : loadDrawable(context, statusBarIcon);
 
         TypedValue typedValue = new TypedValue();
         sysuiContext.getResources().getValue(R.dimen.status_bar_icon_scale_factor,
@@ -681,7 +733,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
     }
 
     private void updateIconColor() {
-        if (mShowsConversation) {
+        if (mShowsConversation || mColoredIcon) {
             setColorFilter(null);
             return;
         }
