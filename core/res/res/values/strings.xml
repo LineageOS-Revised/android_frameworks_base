@@ -5587,6 +5587,13 @@
     <string name="private_profile_label_badge">Private <xliff:g id="label" example="Messenger">%1$s</xliff:g></string>
 
     <!--
+        Used to wrap a label for content description for a Sandbox profile, e.g. "Sandboxed Messenger"
+        instead of Messenger when the Messenger app is installed in the Sandbox profile.
+        [CHAR LIMIT=20]
+    -->
+    <string name="sandbox_profile_label_badge">Sandboxed <xliff:g id="label" example="Messenger">%1$s</xliff:g></string>
+
+    <!--
         Label to show for apps running on the Headless System User (User 0).
         The Headless System User is a background user that runs system services.
         This label distinguishes apps running on User 0 from apps running on the current user.
@@ -7070,6 +7077,8 @@
     <string name="profile_label_private">Private</string>
     <!-- Clone profile label on a screen. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
     <string name="profile_label_clone">Clone</string>
+    <!-- Sandbox profile label on a screen. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
+    <string name="profile_label_sandbox">Sandbox</string>
     <!-- Work profile label on a screen. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
     <string name="profile_label_work">Work</string>
     <!-- 2nd Work profile label on a screen in case a device has more than one work profiles. This can be used as a tab label for this profile in tabbed views and can be used to represent the profile in sharing surfaces, etc. [CHAR LIMIT=20] -->
@@ -7089,6 +7098,8 @@
     <string name="accessibility_label_private_profile">Private space</string>
     <!-- Accessibility label for clone profile user type [CHAR LIMIT=30] -->
     <string name="accessibility_label_clone_profile">Clone</string>
+    <!-- Accessibility label for sandbox profile user type [CHAR LIMIT=30] -->
+    <string name="accessibility_label_sandbox_profile">Sandbox</string>
     <!-- Accessibility label for clone profile user type [CHAR LIMIT=30] -->
     <string name="accessibility_label_communal_profile">Communal</string>
 

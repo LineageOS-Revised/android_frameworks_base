@@ -737,6 +737,8 @@ public class Utils {
                     userType = UserType.WORK;
                 } else if (ui.isPrivateProfile()) {
                     userType = UserType.PRIVATE;
+                } else if (ui.isSandboxProfile()) {
+                    userType = UserType.SANDBOX;
                 } else if (android.multiuser.Flags.hsuAppManagement()
                         && UserManager.isHeadlessSystemUserMode()
                         && user.getIdentifier() == UserHandle.USER_SYSTEM) {

@@ -36,6 +36,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -76,6 +77,7 @@ public class InstallationFragment extends DialogFragment {
     private View mAppSnippet = null;
     private TextView mCustomMessageTextView = null;
     private View mCustomViewPanel = null;
+    private CheckBox mInstallInSandboxCheckBox = null;
     private ProgressBar mProgressBar = null;
     private ProgressBar mIndeterminateProgressBar = null;
     private View mTitleTemplate = null;
@@ -106,6 +108,7 @@ public class InstallationFragment extends DialogFragment {
         mAppIcon = dialogView.requireViewById(R.id.app_icon);
         mAppLabelTextView = dialogView.requireViewById(R.id.app_label);
         mCustomViewPanel = dialogView.requireViewById(R.id.custom_view_panel);
+        mInstallInSandboxCheckBox = dialogView.requireViewById(R.id.install_in_sandbox);
         mIndeterminateProgressBar = dialogView.requireViewById(R.id.indeterminate_progress_bar);
         mProgressBar = dialogView.requireViewById(R.id.progress_bar);
         mCustomMessageTextView = dialogView.requireViewById(R.id.custom_message);
@@ -183,6 +186,7 @@ public class InstallationFragment extends DialogFragment {
         Log.i(LOG_TAG, "updateUI " + LOG_TAG + "\n" + installStage.getStageCode());
 
         this.setCancelable(true);
+        mInstallInSandboxCheckBox.setVisibility(View.GONE);
 
         // When A11y is enabled, if there are no buttons in some cases E.g. installing,
         // the button panel should not be focused without any descriptions. Set the button
@@ -623,6 +627,15 @@ public class InstallationFragment extends DialogFragment {
         // Set the app icon and label
         mAppIcon.setImageDrawable(installStage.getAppIcon());
         mAppLabelTextView.setText(installStage.getAppLabel());
+
+        final InstallViewModel installViewModel =
+                new ViewModelProvider(requireActivity()).get(InstallViewModel.class);
+        if (installViewModel.canInstallInSandbox()) {
+            mInstallInSandboxCheckBox.setVisibility(View.VISIBLE);
+            mInstallInSandboxCheckBox.setChecked(installViewModel.isInstallInSandbox());
+            mInstallInSandboxCheckBox.setOnCheckedChangeListener((buttonView, isChecked) ->
+                    installViewModel.setInstallInSandbox(isChecked));
+        }
 
         // Set the title and the message
         String title = null;

@@ -1733,6 +1733,10 @@ public class ApplicationsState {
             return UserManager.USER_TYPE_PROFILE_PRIVATE.equals(mProfileType);
         }
 
+        public boolean isSandboxProfile() {
+            return UserManager.USER_TYPE_PROFILE_SANDBOX.equals(mProfileType);
+        }
+
         /**
          * Checks if the user that the app belongs to have the property
          * {@link UserProperties#SHOW_IN_SETTINGS_WITH_PARENT} set.

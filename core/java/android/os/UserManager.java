@@ -202,6 +202,13 @@ public class UserManager {
     public static final String USER_TYPE_PROFILE_PRIVATE = "android.os.usertype.profile.PRIVATE";
 
     /**
+     * User type representing a sandbox profile. Sandbox profile is a user profile used to run
+     * apps isolated from the parent user's data, files, contacts and accounts.
+     * @hide
+     */
+    public static final String USER_TYPE_PROFILE_SANDBOX = "android.os.usertype.profile.SANDBOX";
+
+    /**
      * User type representing a generic profile for testing purposes. Only on debuggable builds.
      * @hide
      */
@@ -3402,6 +3409,17 @@ public class UserManager {
     @android.ravenwood.annotation.RavenwoodKeep
     public static boolean isUserTypePrivateProfile(@Nullable String userType) {
         return USER_TYPE_PROFILE_PRIVATE.equals(userType);
+    }
+
+    /**
+     * Returns whether the user type is a
+     * {@link UserManager#USER_TYPE_PROFILE_SANDBOX sandbox profile}.
+     *
+     * @hide
+     */
+    @android.ravenwood.annotation.RavenwoodKeep
+    public static boolean isUserTypeSandboxProfile(@Nullable String userType) {
+        return USER_TYPE_PROFILE_SANDBOX.equals(userType);
     }
 
     /**

@@ -418,6 +418,11 @@ public class UserInfo implements Parcelable {
         return UserManager.isUserTypePrivateProfile(userType);
     }
 
+    /** @hide */
+    public boolean isSandboxProfile() {
+        return UserManager.isUserTypeSandboxProfile(userType);
+    }
+
     public boolean isSupervisingProfile() {
         return UserManager.isUserTypeSupervisingProfile(userType);
     }

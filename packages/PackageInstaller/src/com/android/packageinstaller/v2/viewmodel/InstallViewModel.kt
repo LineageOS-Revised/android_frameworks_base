@@ -158,6 +158,18 @@ class InstallViewModel(application: Application, val repository: InstallReposito
         repository.initiateInstall()
     }
 
+    fun canInstallInSandbox(): Boolean {
+        return repository.canInstallInSandbox()
+    }
+
+    fun isInstallInSandbox(): Boolean {
+        return repository.installInSandbox
+    }
+
+    fun setInstallInSandbox(installInSandbox: Boolean) {
+        repository.installInSandbox = installInSandbox
+    }
+
     fun abortStaging() {
         repository.abortStaging()
     }

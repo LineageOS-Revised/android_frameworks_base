@@ -110,6 +110,7 @@ to pre-existing users, but cannot uninstall pre-existing system packages from pr
         <install-in user-type="PROFILE" />
         <do-not-install-in user-type="android.os.usertype.profile.CLONE" />
         <do-not-install-in user-type="android.os.usertype.profile.PRIVATE" />
+        <do-not-install-in user-type="android.os.usertype.profile.SANDBOX" />
     </install-in-user-type>
 
     <!-- Settings Storage (SettingsProvider)  -->
@@ -176,6 +177,7 @@ to pre-existing users, but cannot uninstall pre-existing system packages from pr
         <install-in user-type="FULL" />
         <install-in user-type="android.os.usertype.profile.MANAGED" />
         <install-in user-type="android.os.usertype.profile.PRIVATE" />
+        <install-in user-type="android.os.usertype.profile.SANDBOX" />
     </install-in-user-type>
 
     <!--AiSeal for AppSearch configuration package (RELEASE_AISEAL_FRAMEWORK)  -->
@@ -209,6 +211,7 @@ to pre-existing users, but cannot uninstall pre-existing system packages from pr
         <install-in user-type="FULL" />
         <install-in user-type="android.os.usertype.profile.MANAGED" />
         <install-in user-type="android.os.usertype.profile.PRIVATE" />
+        <install-in user-type="android.os.usertype.profile.SANDBOX" />
     </install-in-user-type>
 
     <!--  Contacts provider app (ContactsProvider) -->

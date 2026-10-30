@@ -19,6 +19,7 @@ package com.android.packageinstaller.v2.model
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AppOpsManager
 import android.app.PendingIntent
 import android.app.admin.DevicePolicyManager
@@ -42,6 +43,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.os.UserHandle
 import android.os.UserManager
 import android.text.TextUtils
 import android.util.EventLog
@@ -147,6 +149,7 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
      */
     private var newPackageInfo: PackageInfo? = null
     private var wasUserConfirmationTriggeredByPia = false
+    var installInSandbox = false
 
     /**
      * Extracts information from the incoming install intent, checks caller's permission to install
@@ -1067,6 +1070,7 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
      * installation and commit the staged session here. If the installation was session based,
      * signal the PackageInstaller that the user has granted permission to proceed with the install
      */
+    @OptIn(DelicateCoroutinesApi::class)
     fun initiateInstall() {
         if (!this::intent.isInitialized || !this::appSnippet.isInitialized) {
             Log.e(LOG_TAG, "intent or appSnippet not initialized")
@@ -1134,6 +1138,27 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
             context, installId, broadcastIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
+        if (installInSandbox) {
+            GlobalScope.launch(Dispatchers.IO) {
+                val sandboxSessionId = stageForSandbox()
+                launch(Dispatchers.Main) {
+                    if (sandboxSessionId > 0) {
+                        stagedSessionId = sandboxSessionId
+                        commitStagedSession(pendingIntent)
+                    } else {
+                        setStageBasedOnResult(
+                            PackageInstaller.STATUS_FAILURE,
+                            PackageManager.INSTALL_FAILED_INTERNAL_ERROR, null
+                        )
+                    }
+                }
+            }
+            return
+        }
+        commitStagedSession(pendingIntent)
+    }
+
+    private fun commitStagedSession(pendingIntent: PendingIntent) {
         try {
             val session = packageInstaller.openSession(stagedSessionId)
             session.commit(pendingIntent.intentSender)
@@ -1143,6 +1168,82 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
             setStageBasedOnResult(
                 PackageInstaller.STATUS_FAILURE, PackageManager.INSTALL_FAILED_INTERNAL_ERROR, null)
         }
+    }
+
+    /**
+     * Returns whether the APK staged by PIA can be installed in the sandbox profile instead of
+     * the current user.
+     */
+    fun canInstallInSandbox(): Boolean {
+        return sessionId <= 0 && stagedSessionId > 0 && userManager?.isMainUser == true
+    }
+
+    private fun getSandboxUser(): UserHandle? {
+        return userManager?.userProfiles?.firstOrNull { user ->
+            user != Process.myUserHandle() && try {
+                context.createContextAsUser(user, 0).getSystemService(UserManager::class.java)
+                    ?.isUserOfType(USER_TYPE_PROFILE_SANDBOX) == true
+            } catch (e: IllegalStateException) {
+                false
+            }
+        }
+    }
+
+    private fun createSandboxUser(): UserHandle? {
+        return try {
+            userManager?.createProfile(SANDBOX_PROFILE_NAME, USER_TYPE_PROFILE_SANDBOX, emptySet())
+                ?.also { context.getSystemService(ActivityManager::class.java)?.startProfile(it) }
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to create the sandbox profile", e)
+            null
+        }
+    }
+
+    /**
+     * Copies the APK staged for the current user into a new session for the sandbox profile and
+     * abandons the original one.
+     *
+     * @return the id of the sandbox session, or [SessionInfo.INVALID_ID] on failure
+     */
+    private fun stageForSandbox(): Int {
+        val sandboxUser = getSandboxUser() ?: createSandboxUser() ?: return SessionInfo.INVALID_ID
+        val sandboxInstaller = try {
+            context.createContextAsUser(sandboxUser, 0).packageManager.packageInstaller
+        } catch (e: IllegalStateException) {
+            Log.e(LOG_TAG, "Package installer is not available in the sandbox profile", e)
+            return SessionInfo.INVALID_ID
+        }
+        var sandboxSessionId = SessionInfo.INVALID_ID
+        try {
+            val uri = intent.data!!
+            context.contentResolver.openAssetFileDescriptor(uri, "r").use { afd ->
+                sandboxSessionId = sandboxInstaller.createSession(
+                    createSessionParams(
+                        originatingUid, intent, afd?.parcelFileDescriptor, uri.toString()
+                    )
+                )
+            }
+            packageInstaller.openSession(stagedSessionId).use { staged ->
+                sandboxInstaller.openSession(sandboxSessionId).use { session ->
+                    for (name in staged.names) {
+                        staged.openRead(name).use { input ->
+                            session.openWrite(name, 0, -1).use { output ->
+                                input.copyTo(output)
+                                session.fsync(output)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to stage the APK for the sandbox profile", e)
+            if (sandboxSessionId > 0) {
+                sandboxInstaller.abandonSession(sandboxSessionId)
+            }
+            return SessionInfo.INVALID_ID
+        }
+        packageInstaller.abandonSession(stagedSessionId)
+        return sandboxSessionId
     }
 
     private fun setStageBasedOnResult(
@@ -1163,6 +1264,8 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
         if (statusCode == PackageInstaller.STATUS_SUCCESS) {
             val resultIntent = if (shouldReturnResult) {
                 Intent().putExtra(Intent.EXTRA_INSTALL_RESULT, PackageManager.INSTALL_SUCCEEDED)
+            } else if (installInSandbox) {
+                null
             } else {
                 val intent = packageManager.getLaunchIntentForPackage(newPackageInfo!!.packageName)
                 if (isLauncherActivityEnabled(intent)) intent else null
@@ -1274,6 +1377,8 @@ class InstallRepository(private val context: Context) : EventResultPersister.Eve
         const val EXTRA_STAGED_SESSION_ID = "com.android.packageinstaller.extra.STAGED_SESSION_ID"
         const val SCHEME_PACKAGE = "package"
         const val BROADCAST_ACTION = "com.android.packageinstaller.ACTION_INSTALL_COMMIT"
+        private const val USER_TYPE_PROFILE_SANDBOX = "android.os.usertype.profile.SANDBOX"
+        private const val SANDBOX_PROFILE_NAME = "Sandbox"
         private val LOG_TAG = InstallRepository::class.java.simpleName
     }
 

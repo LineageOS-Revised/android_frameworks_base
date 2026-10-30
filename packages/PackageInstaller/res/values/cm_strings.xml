@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Install confirmation: install the app only in the sandbox profile -->
+    <string name="install_in_sandbox">Install in sandbox</string>
+</resources>

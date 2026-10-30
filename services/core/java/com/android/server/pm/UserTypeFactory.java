@@ -36,6 +36,7 @@ import static android.os.UserManager.USER_TYPE_PROFILE_CLONE;
 import static android.os.UserManager.USER_TYPE_PROFILE_COMMUNAL;
 import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
 import static android.os.UserManager.USER_TYPE_PROFILE_PRIVATE;
+import static android.os.UserManager.USER_TYPE_PROFILE_SANDBOX;
 import static android.os.UserManager.USER_TYPE_PROFILE_SUPERVISING;
 import static android.os.UserManager.USER_TYPE_PROFILE_TEST;
 import static android.os.UserManager.USER_TYPE_SYSTEM_HEADLESS;
@@ -122,6 +123,7 @@ public final class UserTypeFactory {
         builders.put(USER_TYPE_PROFILE_CLONE, getDefaultTypeProfileClone());
         builders.put(USER_TYPE_PROFILE_COMMUNAL, getDefaultTypeProfileCommunal());
         builders.put(USER_TYPE_PROFILE_PRIVATE, getDefaultTypeProfilePrivate());
+        builders.put(USER_TYPE_PROFILE_SANDBOX, getDefaultTypeProfileSandbox());
         builders.put(USER_TYPE_PROFILE_SUPERVISING, getDefaultTypeProfileSupervising());
         if (Build.IS_DEBUGGABLE) {
             builders.put(USER_TYPE_PROFILE_TEST, getDefaultTypeProfileTest());
@@ -358,6 +360,55 @@ public final class UserTypeFactory {
                         .setProfileApiVisibility(
                                 UserProperties.PROFILE_API_VISIBILITY_HIDDEN)
                         .setItemsRestrictedOnHomeScreen(true)
+                        .setUpdateCrossProfileIntentFiltersOnOTA(true));
+    }
+
+    /**
+     * Returns the Builder for the default {@link UserManager#USER_TYPE_PROFILE_SANDBOX}
+     * configuration.
+     */
+    private static UserTypeDetails.Builder getDefaultTypeProfileSandbox() {
+        return new UserTypeDetails.Builder()
+                .setName(USER_TYPE_PROFILE_SANDBOX)
+                .setBaseType(FLAG_PROFILE)
+                .setMaxAllowed(getDefaultMaxAllowedForSwitchableTypes())
+                .setMaxAllowedPerParent(1)
+                .setProfileParentRequired(true)
+                .setLabels(R.string.profile_label_sandbox)
+                .setIconBadge(com.android.internal.R.drawable.ic_sandbox_icon_badge)
+                .setBadgePlain(com.android.internal.R.drawable.ic_sandbox_badge)
+                .setBadgeNoBackground(com.android.internal.R.drawable.ic_sandbox_badge)
+                .setStatusBarIcon(com.android.internal.R.drawable.stat_sys_sandbox_profile_status)
+                .setBadgeLabels(
+                        com.android.internal.R.string.sandbox_profile_label_badge)
+                .setBadgeColors(
+                        com.android.internal.R.color.system_neutral2_800)
+                .setDarkThemeBadgeColors(
+                        com.android.internal.R.color.system_neutral2_900)
+                .setAccessibilityString(com.android.internal
+                        .R.string.accessibility_label_sandbox_profile)
+                .setDefaultRestrictions(getDefaultProfileRestrictions())
+                .setDefaultSecureSettings(getDefaultNonManagedProfileSecureSettings())
+                .setDefaultCrossProfileIntentFilters(getDefaultPrivateCrossProfileIntentFilter())
+                .setDefaultUserProperties(new UserProperties.Builder()
+                        .setStartWithParent(true)
+                        .setCredentialShareableWithParent(true)
+                        .setMediaSharedWithParent(false)
+                        .setUseParentsContacts(false)
+                        .setDeleteAppWithParent(false)
+                        .setShowInLauncher(UserProperties.SHOW_IN_LAUNCHER_SEPARATE)
+                        .setShowInSettings(UserProperties.SHOW_IN_SETTINGS_WITH_PARENT)
+                        .setShowInQuietMode(
+                                UserProperties.SHOW_IN_QUIET_MODE_PAUSED)
+                        .setShowInSharingSurfaces(
+                                UserProperties.SHOW_IN_SHARING_SURFACES_SEPARATE)
+                        .setCrossProfileIntentFilterAccessControl(
+                                UserProperties.CROSS_PROFILE_INTENT_FILTER_ACCESS_LEVEL_SYSTEM)
+                        .setInheritDevicePolicy(UserProperties.INHERIT_DEVICE_POLICY_FROM_PARENT)
+                        .setCrossProfileContentSharingStrategy(
+                                UserProperties.CROSS_PROFILE_CONTENT_SHARING_DELEGATE_FROM_PARENT)
+                        .setProfileApiVisibility(
+                                UserProperties.PROFILE_API_VISIBILITY_VISIBLE)
                         .setUpdateCrossProfileIntentFiltersOnOTA(true));
     }
 

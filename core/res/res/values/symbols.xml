@@ -1186,9 +1186,11 @@
   <java-symbol type="string" name="managed_profile_label_badge_3" />
   <java-symbol type="string" name="clone_profile_label_badge" />
   <java-symbol type="string" name="private_profile_label_badge" />
+  <java-symbol type="string" name="sandbox_profile_label_badge" />
   <java-symbol type="string" name="hsu_label_badge" />
   <java-symbol type="string" name="profile_label_private" />
   <java-symbol type="string" name="profile_label_clone" />
+  <java-symbol type="string" name="profile_label_sandbox" />
   <java-symbol type="string" name="profile_label_work" />
   <java-symbol type="string" name="profile_label_work_2" />
   <java-symbol type="string" name="profile_label_work_3" />
@@ -1198,6 +1200,7 @@
   <java-symbol type="string" name="accessibility_label_managed_profile" />
   <java-symbol type="string" name="accessibility_label_private_profile" />
   <java-symbol type="string" name="accessibility_label_clone_profile" />
+  <java-symbol type="string" name="accessibility_label_sandbox_profile" />
   <java-symbol type="string" name="accessibility_label_communal_profile" />
   <java-symbol type="string" name="private_space_biometric_prompt_title" />
   <java-symbol type="string" name="mediasize_unknown_portrait" />
@@ -1560,6 +1563,9 @@
   <java-symbol type="drawable" name="ic_private_profile_icon_badge" />
   <java-symbol type="drawable" name="ic_private_profile_badge" />
   <java-symbol type="drawable" name="stat_sys_private_profile_status" />
+  <java-symbol type="drawable" name="ic_sandbox_icon_badge" />
+  <java-symbol type="drawable" name="ic_sandbox_badge" />
+  <java-symbol type="drawable" name="stat_sys_sandbox_profile_status" />
 
   <java-symbol type="drawable" name="sim_light_blue" />
   <java-symbol type="drawable" name="sim_light_green" />
