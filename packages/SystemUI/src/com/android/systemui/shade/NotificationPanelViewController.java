@@ -89,8 +89,6 @@ import android.animation.AnimatorSet;
 import android.animation.PropertyValuesHolder;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
-import android.view.ViewTreeObserver.InternalInsetsInfo;
-import android.view.ViewTreeObserver.OnComputeInternalInsetsListener;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -612,6 +610,7 @@ public final class NotificationPanelViewController implements
     private boolean mReTickerVisible = false;
     private boolean mIsAnimatingTicker = false;
     private boolean mIsDismissRequested = false;
+    private AnimatorSet mReTickerDismissAnimator;
     private ContentObserver mReTickerObserver;
 
     @Inject
@@ -3572,6 +3571,10 @@ public final class NotificationPanelViewController implements
                 mNotificationStackScrollLayoutController.generateHeadsUpAnimation(entry, false);
                 entry.setHeadsUpIsVisible();
             }
+            NotificationEntry topEntry = mHeadsUpManager.getTopEntry();
+            if (topEntry != null && topEntry != entry && topEntry.isRowPinned()) {
+                return;
+            }
             reTickerView(false);
         }
     }
@@ -4489,14 +4492,6 @@ public final class NotificationPanelViewController implements
                 retickerDismiss(true);
             }
         }
-
-        if (mReTickerComeback != null) {
-            if (mReTickerComeback.getVisibility() == View.VISIBLE) {
-                mReTickerComeback.getViewTreeObserver().addOnComputeInternalInsetsListener(mInsetsListener);
-            } else {
-                mReTickerComeback.getViewTreeObserver().removeOnComputeInternalInsetsListener(mInsetsListener);
-            }
-        }
     }
 
     public void retickerAnimate() {
@@ -4504,6 +4499,7 @@ public final class NotificationPanelViewController implements
             return; // Animation is already running
         }
 
+        cancelReTickerDismiss();
         mIsAnimatingTicker = true;
         mIsDismissRequested = false;
 
@@ -4566,12 +4562,12 @@ public final class NotificationPanelViewController implements
         }
 
         if (instant) {
+            cancelReTickerDismiss();
             mIsAnimatingTicker = false;
             mIsDismissRequested = false;
             mReTickerComeback.setVisibility(View.GONE);
             mNotificationStackScroller.setVisibility(View.VISIBLE);
             mReTickerVisible = false;
-            mReTickerComeback.getViewTreeObserver().removeOnComputeInternalInsetsListener(mInsetsListener);
             return;
         }
 
@@ -4583,6 +4579,7 @@ public final class NotificationPanelViewController implements
         }
 
         AnimatorSet animatorSet = new AnimatorSet();
+        mReTickerDismissAnimator = animatorSet;
         animatorSet.setInterpolator(new AccelerateDecelerateInterpolator());
 
         // Set final values for scale and translation
@@ -4617,14 +4614,22 @@ public final class NotificationPanelViewController implements
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                mReTickerDismissAnimator = null;
                 mReTickerComeback.setVisibility(View.GONE);
                 mNotificationStackScroller.setVisibility(View.VISIBLE);
                 mReTickerVisible = false;
-                mReTickerComeback.getViewTreeObserver().removeOnComputeInternalInsetsListener(mInsetsListener);
             }
         });
 
         animatorSet.start();
+    }
+
+    private void cancelReTickerDismiss() {
+        if (mReTickerDismissAnimator != null) {
+            mReTickerDismissAnimator.removeAllListeners();
+            mReTickerDismissAnimator.cancel();
+            mReTickerDismissAnimator = null;
+        }
     }
 
     private Drawable getRetickerBackgroundDrawable(String pkgname, int notificationColor) {
@@ -4644,17 +4649,4 @@ public final class NotificationPanelViewController implements
         }
         return dw;
     }
-
-    private final OnComputeInternalInsetsListener mInsetsListener = internalInsetsInfo -> {
-        internalInsetsInfo.touchableRegion.setEmpty();
-        internalInsetsInfo.setTouchableInsets(InternalInsetsInfo.TOUCHABLE_INSETS_REGION);
-        int[] mainLocation = new int[2];
-        mReTickerComeback.getLocationOnScreen(mainLocation);
-        internalInsetsInfo.touchableRegion.set(new Region(
-            mainLocation[0],
-            mainLocation[1],
-            mainLocation[0] + mReTickerComeback.getWidth(),
-            mainLocation[1] + mReTickerComeback.getHeight()
-        ));
-    };
 }

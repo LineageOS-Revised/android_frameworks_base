@@ -103,6 +103,7 @@ public final class ShadeTouchableRegionManager implements Dumpable {
 
     private View mNotificationShadeWindowView;
     private View mNotificationPanelView;
+    private View mReTickerView;
 
     private final OnComputeInternalInsetsListener mOnComputeInternalInsetsListener;
 
@@ -302,6 +303,16 @@ public final class ShadeTouchableRegionManager implements Dumpable {
             mTouchableRegion.set(0, 0, mNotificationShadeWindowView.getWidth(),
                     mStatusBarHeight);
             updateRegionForNotch(mTouchableRegion);
+        }
+        if (mReTickerView == null && mNotificationShadeWindowView != null) {
+            mReTickerView = mNotificationShadeWindowView.findViewById(R.id.ticker_comeback);
+        }
+        if (mReTickerView != null && mReTickerView.isShown()) {
+            int[] location = new int[2];
+            mReTickerView.getLocationOnScreen(location);
+            mTouchableRegion.union(new Rect(location[0], location[1],
+                    location[0] + mReTickerView.getWidth(),
+                    location[1] + mReTickerView.getHeight()));
         }
         return mTouchableRegion;
     }
