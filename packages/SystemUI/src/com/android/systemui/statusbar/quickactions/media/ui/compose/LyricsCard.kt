@@ -108,7 +108,9 @@ fun LyricsCard(
 
                     Text(
                         text = line.text,
-                        color = LocalContentColor.current,
+                        color =
+                            model.colorScheme?.primary?.takeIf { isActive }
+                                ?: LocalContentColor.current,
                         fontSize = (16.sp * scale),
                         fontWeight = fontWeight,
                         textAlign = TextAlign.Center,

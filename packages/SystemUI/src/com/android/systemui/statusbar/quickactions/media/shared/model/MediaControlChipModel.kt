@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.quickactions.media.shared.model
 
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.media.controls.shared.model.MediaAction
+import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 
 /** Model used to display and control media from the status bar island. */
 data class MediaControlChipModel(
@@ -39,4 +40,5 @@ data class MediaControlChipModel(
     val lyrics: String? = null,
     val syncedLyrics: String? = null,
     val openOutputSwitcher: (() -> Unit)? = null,
+    val colorScheme: MediaColorScheme? = null,
 )

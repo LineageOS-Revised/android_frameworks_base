@@ -222,7 +222,7 @@ fun StatusBarDynamicIslandChip(
                     if (popupContent.model.isPlaying) {
                         AudioReactiveBars(
                             isPlaying = true,
-                            color = chipContentColor,
+                            color = popupContent.model.colorScheme?.primary ?: chipContentColor,
                         )
                     }
                 is PopupContentModel.ScreenRecord ->

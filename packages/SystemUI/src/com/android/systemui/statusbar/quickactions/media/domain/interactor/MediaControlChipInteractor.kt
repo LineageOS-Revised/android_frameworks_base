@@ -334,6 +334,7 @@ private fun MediaDataModel.toMediaControlState(
                 positionMs = positionMs,
                 canBeScrubbed = canBeScrubbed,
                 isPlaying = state is MediaSessionState.Playing || state is MediaSessionState.Buffering,
+                colorScheme = colorScheme,
             ),
         token = token,
     )
