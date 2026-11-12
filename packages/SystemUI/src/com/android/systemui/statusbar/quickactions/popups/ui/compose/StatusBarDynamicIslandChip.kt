@@ -18,13 +18,12 @@ package com.android.systemui.statusbar.quickactions.popups.ui.compose
 
 import android.view.DisplayCutout
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -34,8 +33,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,10 +76,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /** Single centered status bar capsule styled like a compact dynamic island. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatusBarDynamicIslandChip(
     viewModel: PopupChipModel.Shown,
-    pageCount: Int,
     cutoutSpec: DynamicIslandCutoutSpec,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,7 +87,7 @@ fun StatusBarDynamicIslandChip(
     onReservedWidthChanged: (Int) -> Unit = {},
 ) {
     val isMediaChip = viewModel.popupContent is PopupContentModel.Media
-    val chipShape = RoundedCornerShape(50)
+    val chipShape = CircleShape
     val colors = viewModel.colors
     val chipBackgroundColor =
         colors.chipBackground(
@@ -125,23 +125,12 @@ fun StatusBarDynamicIslandChip(
 
     val hasCutout = cutoutSpec.hasCutout
     val cutoutGap = if (hasCutout) cutoutSpec.embeddedGapWidth else 0.dp
-    val compactWidth = compactIslandWidthFor(viewModel.popupContent)?.plus(cutoutGap)
     val hasInlineTimer = viewModel.popupContent is PopupContentModel.Stopwatch
     val trailingDecorationWidth =
         when (val popupContent = viewModel.popupContent) {
-            is PopupContentModel.Media ->
-                if (popupContent.model.isPlaying) {
-                    14.dp
-                } else if (pageCount > 1) {
-                    11.dp
-                } else {
-                    0.dp
-                }
-            is PopupContentModel.ScreenRecord -> 11.dp
+            is PopupContentModel.Media -> if (popupContent.model.isPlaying) 14.dp else 0.dp
             is PopupContentModel.Transfer -> 22.dp
-            else -> {
-                if (pageCount > 1) 11.dp else 0.dp
-            }
+            else -> 0.dp
         }
     val leadingDecorationWidth =
         when {
@@ -149,7 +138,7 @@ fun StatusBarDynamicIslandChip(
             else -> 18.dp + (8.dp * (viewModel.icons.size - 1))
         }
     val maxTextWidth =
-        (CompactIslandMaxWidth - 24.dp - leadingDecorationWidth - trailingDecorationWidth)
+        (CompactIslandMaxWidth - 20.dp - leadingDecorationWidth - trailingDecorationWidth)
             .coerceAtLeast(56.dp)
 
     val chipText =
@@ -235,24 +224,9 @@ fun StatusBarDynamicIslandChip(
                             isPlaying = true,
                             color = chipContentColor,
                         )
-                    } else if (pageCount > 1) {
-                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
                     }
                 is PopupContentModel.ScreenRecord ->
-                    when (val model = popupContent.model) {
-                        is ScreenRecordPopupModel.Starting ->
-                            StatusContent(
-                                text = viewModel.chipText.orEmpty(),
-                                color = chipContentColor,
-                                showSwipeHint = pageCount > 1,
-                            )
-                        is ScreenRecordPopupModel.Recording ->
-                            StatusContent(
-                                text = viewModel.chipText.orEmpty(),
-                                color = chipContentColor,
-                                showSwipeHint = pageCount > 1,
-                            )
-                    }
+                    StatusContent(text = viewModel.chipText.orEmpty(), color = chipContentColor)
                 is PopupContentModel.Stopwatch ->
                     StatusContent(
                         text =
@@ -261,7 +235,6 @@ fun StatusBarDynamicIslandChip(
                                     popupContent.model.baseElapsedRealtimeMs
                                 ),
                         color = chipContentColor,
-                        showSwipeHint = pageCount > 1,
                     )
                 is PopupContentModel.Transfer ->
                     CircularProgressIndicator(
@@ -281,17 +254,10 @@ fun StatusBarDynamicIslandChip(
                                     timer.isCountDown,
                                 ),
                             color = chipContentColor,
-                            showSwipeHint = pageCount > 1,
                         )
-                    } else if (pageCount > 1) {
-                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
                     }
                 }
-                else -> {
-                    if (pageCount > 1) {
-                        SwipeHint(color = chipContentColor.copy(alpha = 0.72f))
-                    }
-                }
+                else -> Unit
             }
         }
     }
@@ -303,15 +269,12 @@ fun StatusBarDynamicIslandChip(
                 .then(boundsModifier)
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
-                .widthIn(
-                    min = compactWidth ?: 0.dp,
-                    max = compactWidth ?: (CompactIslandMaxWidth + cutoutGap),
-                )
+                .widthIn(max = CompactIslandMaxWidth + cutoutGap)
                 .clip(chipShape)
                 .background(chipBackgroundColor)
                 .border(width = 1.dp, color = chipOutline, shape = chipShape)
                 .clickable(onClick = onTap)
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
     ) { (leadingMeasurables, trailingMeasurables), constraints ->
         val gap = if (hasCutout) cutoutGap.roundToPx() else 0
         val spacing = if (hasCutout) 0 else 8.dp.roundToPx()
@@ -342,8 +305,7 @@ fun StatusBarDynamicIslandChip(
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, height) {
             val rightX =
-                if (hasCutout || compactWidth != null) width - rightWidth
-                else leftWidth + usedSpacing
+                if (hasCutout) width - rightWidth else leftWidth + usedSpacing
             left.forEach { it.place(0, (height - it.height) / 2) }
             right.forEach { it.place(rightX, (height - it.height) / 2) }
         }
@@ -387,6 +349,7 @@ private fun splitAroundCutout(
 
 private const val DotSeparator = " · "
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UtilityStatusIslandChip(
     viewModel: PopupChipModel.Shown,
@@ -397,12 +360,6 @@ private fun UtilityStatusIslandChip(
     chipOutline: Color,
     modifier: Modifier = Modifier,
 ) {
-    // Both halves are equally wide so the gap in the middle sits over the camera.
-    val halfWidth =
-        when (viewModel.popupContent) {
-            is PopupContentModel.Flashlight -> 48.dp
-            else -> 68.dp
-        }
     val utilityText =
         when (val popupContent = viewModel.popupContent) {
             is PopupContentModel.ScreenRecord ->
@@ -424,33 +381,44 @@ private fun UtilityStatusIslandChip(
             modifier
                 .openSquishAnimation(viewModel.isPopupShown)
                 .defaultMinSize(minHeight = 32.dp)
-                .clip(RoundedCornerShape(50))
+                .widthIn(max = CompactIslandMaxWidth + cutoutSpec.embeddedGapWidth)
+                // Weighted halves of an intrinsic-width row are equally wide and as narrow as
+                // the content allows, so the gap in the middle sits over the camera.
+                .width(IntrinsicSize.Max)
+                .clip(CircleShape)
                 .background(chipBackgroundColor)
-                .border(width = 1.dp, color = chipOutline, shape = RoundedCornerShape(50))
+                .border(width = 1.dp, color = chipOutline, shape = CircleShape)
                 .clickable(onClick = onTap),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.width(halfWidth).padding(horizontal = 10.dp),
+            modifier = Modifier.weight(1f).padding(start = 10.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Icon(
-                icon = viewModel.icons.first().icon,
-                modifier = Modifier.size(16.dp),
-                tint = chipContentColor,
-            )
+            val content = viewModel.popupContent
+            if (content is PopupContentModel.ScreenRecord &&
+                content.model is ScreenRecordPopupModel.Starting
+            ) {
+                LoadingIndicator(modifier = Modifier.size(16.dp), color = chipContentColor)
+            } else {
+                Icon(
+                    icon = viewModel.icons.first().icon,
+                    modifier = Modifier.size(16.dp),
+                    tint = chipContentColor,
+                )
+            }
         }
-        Spacer(modifier = Modifier.width(cutoutSpec.embeddedGapWidth))
-        Box(
+        Spacer(
             modifier =
-                Modifier.width(halfWidth)
-                    .padding(start = 6.dp, top = 7.dp, bottom = 7.dp, end = 10.dp),
+                Modifier.width(if (cutoutSpec.hasCutout) cutoutSpec.embeddedGapWidth else 8.dp)
+        )
+        Box(
+            modifier = Modifier.weight(1f).padding(top = 7.dp, bottom = 7.dp, end = 10.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
             Text(
                 text = utilityText,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                 color = chipContentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -462,52 +430,20 @@ private fun UtilityStatusIslandChip(
 }
 
 @Composable
-private fun StatusContent(
-    text: String,
-    color: Color,
-    showSwipeHint: Boolean,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = color,
-            maxLines = 1,
-        )
-        if (showSwipeHint) {
-            SwipeHint(color = color.copy(alpha = 0.72f))
-        }
-    }
+private fun StatusContent(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+        color = color,
+        maxLines = 1,
+    )
 }
 
-@Composable
-private fun SwipeHint(color: Color) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(2) {
-            Box(
-                modifier = Modifier.size(width = 3.dp, height = 3.dp)
-                    .background(color = color, shape = CircleShape)
-            )
-        }
-    }
-}
-
-private val CompactIslandMaxWidth = 192.dp
-private val CompactMediaIslandWidth = 108.dp
-private val CompactTimerIslandWidth = 116.dp
-private val CompactRecordingIslandWidth = 88.dp
-private val CompactAlarmIslandWidth = 92.dp
-private val CompactUtilityIslandWidth = 74.dp
+private val CompactIslandMaxWidth = 160.dp
 private val DynamicIslandEmbeddedGapFallbackWidth = 38.dp
 private val DynamicIslandEmbeddedGapMinWidth = 34.dp
 private val DynamicIslandEmbeddedGapMaxWidth = 88.dp
-private val DynamicIslandEmbeddedGapSidePadding = 6.dp
+private val DynamicIslandEmbeddedGapSidePadding = 4.dp
 
 data class DynamicIslandCutoutSpec(
     val embeddedGapWidth: Dp,
@@ -562,60 +498,23 @@ private fun PopupContentModel.isUtilityStatusContent(): Boolean {
         this is PopupContentModel.Flashlight
 }
 
-private fun compactIslandWidthFor(content: PopupContentModel): Dp? {
-    return when (content) {
-        is PopupContentModel.Media -> CompactMediaIslandWidth
-        is PopupContentModel.ScreenRecord ->
-            when (content.model) {
-                is ScreenRecordPopupModel.Starting -> CompactTimerIslandWidth
-                is ScreenRecordPopupModel.Recording -> CompactRecordingIslandWidth
-            }
-        is PopupContentModel.Stopwatch -> CompactTimerIslandWidth
-        is PopupContentModel.Alarm -> CompactAlarmIslandWidth
-        is PopupContentModel.Flashlight -> CompactUtilityIslandWidth
-        else -> null
-    }
-}
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Modifier.openSquishAnimation(isOpen: Boolean): Modifier {
     val scaleX = remember { Animatable(1f, visibilityThreshold = 0.01f) }
     val scaleY = remember { Animatable(1f, visibilityThreshold = 0.01f) }
     val currentIsOpen by rememberUpdatedState(isOpen)
+    val spec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
     LaunchedEffect(Unit) {
         snapshotFlow { currentIsOpen }
             .drop(1)
             .collectLatest { open ->
                 if (!open) return@collectLatest
-                scaleX.snapTo(1f)
-                scaleY.snapTo(1f)
+                scaleX.snapTo(0.9f)
+                scaleY.snapTo(1.12f)
                 coroutineScope {
-                    launch {
-                        scaleX.animateTo(
-                            targetValue = 1f,
-                            animationSpec =
-                                keyframes {
-                                    durationMillis = 360
-                                    0.9f at 0
-                                    1.05f at 160 using FastOutSlowInEasing
-                                    0.98f at 280
-                                    1f at 360
-                                },
-                        )
-                    }
-                    launch {
-                        scaleY.animateTo(
-                            targetValue = 1f,
-                            animationSpec =
-                                keyframes {
-                                    durationMillis = 360
-                                    1.12f at 0
-                                    0.94f at 160 using FastOutSlowInEasing
-                                    1.02f at 280
-                                    1f at 360
-                                },
-                        )
-                    }
+                    launch { scaleX.animateTo(1f, spec) }
+                    launch { scaleY.animateTo(1f, spec) }
                 }
             }
     }

@@ -19,14 +19,13 @@ package com.android.systemui.statusbar.quickactions.popups.ui.compose
 import android.view.ViewTreeObserver
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +74,7 @@ import kotlinx.coroutines.launch
  * position and aspect ratio with an independent-axis squish animation, rather than a generic
  * uniform scale-in.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatusBarPopup(
     viewModel: PopupChipModel.Shown,
@@ -140,71 +140,27 @@ fun StatusBarPopup(
         val alpha = remember { Animatable(0f) }
         val translationY = remember { Animatable(-24f) }
 
+        val motionScheme = MaterialTheme.motionScheme
         LaunchedEffect(isVisible, popupBoundsInScreen != null) {
+            val spatial = motionScheme.defaultSpatialSpec<Float>()
             if (isVisible && popupBoundsInScreen != null) {
                 scaleX.snapTo(initialScaleFromChip.x)
                 scaleY.snapTo(initialScaleFromChip.y)
                 alpha.snapTo(0f)
                 translationY.snapTo(-24f)
                 coroutineScope {
-                    launch {
-                        scaleX.animateTo(
-                            targetValue = 1f,
-                            animationSpec =
-                                spring(
-                                    dampingRatio = 0.6f,
-                                    stiffness = Spring.StiffnessLow,
-                                ),
-                        )
-                    }
-                    launch {
-                        scaleY.animateTo(
-                            targetValue = 1f,
-                            animationSpec =
-                                spring(
-                                    dampingRatio = 0.65f,
-                                    stiffness = Spring.StiffnessLow,
-                                ),
-                        )
-                    }
-                    launch {
-                        translationY.animateTo(
-                            targetValue = 0f,
-                            animationSpec =
-                                spring(
-                                    dampingRatio = 0.7f,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                        )
-                    }
-                    launch { alpha.animateTo(1f, animationSpec = tween(180)) }
+                    launch { scaleX.animateTo(1f, spatial) }
+                    launch { scaleY.animateTo(1f, spatial) }
+                    launch { translationY.animateTo(0f, spatial) }
+                    launch { alpha.animateTo(1f, motionScheme.defaultEffectsSpec()) }
                 }
             } else if (!isVisible) {
+                val exit = motionScheme.fastSpatialSpec<Float>()
                 coroutineScope {
-                    launch {
-                        scaleX.animateTo(
-                            targetValue = initialScaleFromChip.x,
-                            animationSpec =
-                                spring(
-                                    dampingRatio = 0.8f,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                        )
-                    }
-                    launch {
-                        scaleY.animateTo(
-                            targetValue = initialScaleFromChip.y,
-                            animationSpec =
-                                spring(
-                                    dampingRatio = 0.8f,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                        )
-                    }
-                    launch {
-                        translationY.animateTo(-16f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
-                    }
-                    launch { alpha.animateTo(0f, animationSpec = tween(160)) }
+                    launch { scaleX.animateTo(initialScaleFromChip.x, exit) }
+                    launch { scaleY.animateTo(initialScaleFromChip.y, exit) }
+                    launch { translationY.animateTo(-16f, exit) }
+                    launch { alpha.animateTo(0f, motionScheme.fastEffectsSpec()) }
                 }
             }
         }
@@ -223,8 +179,8 @@ fun StatusBarPopup(
 
         AnimatedVisibility(
             visible = isVisible,
-            enter = fadeIn(animationSpec = tween(60)),
-            exit = fadeOut(animationSpec = tween(160)),
+            enter = fadeIn(motionScheme.fastEffectsSpec()),
+            exit = fadeOut(motionScheme.fastEffectsSpec()),
         ) {
             Box(
                 modifier =

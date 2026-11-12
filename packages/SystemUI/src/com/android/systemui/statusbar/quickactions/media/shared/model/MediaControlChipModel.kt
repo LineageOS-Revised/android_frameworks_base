@@ -38,4 +38,5 @@ data class MediaControlChipModel(
     val packageName: String? = null,
     val lyrics: String? = null,
     val syncedLyrics: String? = null,
+    val openOutputSwitcher: (() -> Unit)? = null,
 )

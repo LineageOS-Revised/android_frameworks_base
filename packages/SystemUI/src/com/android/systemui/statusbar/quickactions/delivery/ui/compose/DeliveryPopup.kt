@@ -29,7 +29,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +48,7 @@ import com.android.systemui.statusbar.quickactions.delivery.ui.viewmodel.Deliver
 
 private val PopupShape = RoundedCornerShape(32.dp)
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DeliveryPopup(model: DeliveryChipModel, modifier: Modifier = Modifier) {
     val muted = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.73f)
@@ -103,9 +105,9 @@ fun DeliveryPopup(model: DeliveryChipModel, modifier: Modifier = Modifier) {
             }
             val progress = model.progress
             if (progress != null) {
-                LinearProgressIndicator(
+                LinearWavyProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
             } else if (model.stage != null) {

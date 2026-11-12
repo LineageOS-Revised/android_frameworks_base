@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.quickactions.screenrecord.ui.compose
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +27,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,6 +48,7 @@ import com.android.systemui.statusbar.quickactions.screenrecord.shared.model.Scr
 private val PopupShape = RoundedCornerShape(32.dp)
 
 /** Expanded screen-recording status card for the dynamic island. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ScreenRecordPopup(
     model: ScreenRecordPopupModel,
@@ -110,20 +113,16 @@ fun ScreenRecordPopup(
                         fontWeight = FontWeight.Bold,
                         color = accent,
                     )
-                    Box(
-                        modifier =
-                            Modifier.background(
-                                    color = accent.copy(alpha = 0.16f),
-                                    shape = RoundedCornerShape(22.dp),
-                                )
-                                .clickable(onClick = model.stopRecording)
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                    FilledTonalButton(
+                        onClick = model.stopRecording,
+                        shapes = ButtonDefaults.shapes(),
+                        colors =
+                            ButtonDefaults.filledTonalButtonColors(
+                                containerColor = accent.copy(alpha = 0.16f),
+                                contentColor = accent,
+                            ),
                     ) {
-                        Text(
-                            text = stringResource(R.string.screenrecord_stop_label),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = accent,
-                        )
+                        Text(stringResource(R.string.screenrecord_stop_label))
                     }
                 }
             }

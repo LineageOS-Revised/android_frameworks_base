@@ -30,6 +30,9 @@ import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotif
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.quickactions.delivery.domain.DeliveryParser
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.TRANSFERS
+import com.android.systemui.statusbar.quickactions.popups.shared.NotificationActionModel
+import com.android.systemui.statusbar.quickactions.popups.shared.progressActions
+import com.android.systemui.statusbar.quickactions.popups.shared.toPopupActions
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ChipIcon
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ColorsModel
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
@@ -67,7 +70,11 @@ constructor(
         PopupChipId.Transfer,
     ) {
 
-    data class Transfer(val title: String?, val percent: Int)
+    data class Transfer(
+        val title: String?,
+        val percent: Int,
+        val actions: List<NotificationActionModel>,
+    )
 
     override fun parse(entry: NotificationEntry): Transfer? {
         val notification = entry.sbn.notification
@@ -89,6 +96,7 @@ constructor(
         return Transfer(
             title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim(),
             percent = (progress.toLong() * 100 / max).toInt(),
+            actions = notification.progressActions(),
         )
     }
 
@@ -117,6 +125,7 @@ constructor(
                         percent = transfer.percent,
                         moreCount = more,
                         onOpen = onOpen,
+                        actions = transfer.actions.toPopupActions(),
                     )
                 ),
         )

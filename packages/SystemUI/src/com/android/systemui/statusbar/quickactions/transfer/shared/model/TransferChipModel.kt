@@ -17,6 +17,7 @@
 package com.android.systemui.statusbar.quickactions.transfer.shared.model
 
 import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.statusbar.quickactions.popups.shared.model.PopupActionModel
 
 data class TransferChipModel(
     val icon: Icon?,
@@ -25,4 +26,5 @@ data class TransferChipModel(
     val percent: Int,
     val moreCount: Int,
     val onOpen: (() -> Unit)?,
+    val actions: List<PopupActionModel>,
 )

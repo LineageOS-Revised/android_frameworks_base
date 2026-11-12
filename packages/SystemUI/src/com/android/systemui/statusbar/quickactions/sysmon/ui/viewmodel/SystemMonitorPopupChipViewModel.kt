@@ -19,13 +19,16 @@ package com.android.systemui.statusbar.quickactions.sysmon.ui.viewmodel
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
+import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.SYSTEM_MONITOR
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.observeDynamicIslandFeatureEnabled
+import com.android.systemui.statusbar.quickactions.popups.ui.model.ChipIcon
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ColorsModel
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipModel
@@ -102,7 +105,7 @@ constructor(
     private fun toChip(stats: SystemStats): PopupChipModel =
         PopupChipModel.Shown(
             chipId = PopupChipId.SystemMonitor,
-            icons = emptyList(),
+            icons = listOf(ChipIcon(Icon.Resource(R.drawable.ic_qs_system_monitor, null))),
             chipText = "${stats.cpuLoad ?: "--"}% · ${stats.cpuTemp ?: "--"}°C",
             colors = ColorsModel.DynamicIsland,
             popupContent = PopupContentModel.SystemMonitor(SystemMonitorPopupModel(stats, close)),

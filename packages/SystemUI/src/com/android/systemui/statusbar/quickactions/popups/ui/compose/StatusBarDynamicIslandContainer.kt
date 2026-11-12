@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.quickactions.popups.ui.compose
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -27,6 +26,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 /** Phone-only centered dynamic island that pages through active popup chips. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatusBarDynamicIslandContainer(
     chips: List<PopupChipModel.Shown>,
@@ -118,6 +120,7 @@ fun StatusBarDynamicIslandContainer(
     // The swipe detector below is only restarted when the page count changes; this keeps it
     // working with the current chips.
     val currentSelectRelative by rememberUpdatedState<(Int) -> Unit> { selectRelative(it) }
+    val motionScheme = MaterialTheme.motionScheme
 
     Box(
         modifier =
@@ -131,8 +134,8 @@ fun StatusBarDynamicIslandContainer(
             transitionSpec = {
                 val transform =
                     if (targetState == initialState) {
-                        fadeIn(animationSpec = tween(150)) togetherWith
-                            fadeOut(animationSpec = tween(150))
+                        fadeIn(motionScheme.fastEffectsSpec()) togetherWith
+                            fadeOut(motionScheme.fastEffectsSpec())
                     } else {
                         val slideDirection =
                             if (
@@ -144,13 +147,13 @@ fun StatusBarDynamicIslandContainer(
                                 -1
                             }
                         (slideInHorizontally(
-                            animationSpec = tween(220),
+                            animationSpec = motionScheme.fastSpatialSpec(),
                             initialOffsetX = { fullWidth -> slideDirection * fullWidth / 2 },
-                        ) + fadeIn(animationSpec = tween(180))) togetherWith
+                        ) + fadeIn(motionScheme.fastEffectsSpec())) togetherWith
                             (slideOutHorizontally(
-                                animationSpec = tween(200),
+                                animationSpec = motionScheme.fastSpatialSpec(),
                                 targetOffsetX = { fullWidth -> -slideDirection * fullWidth / 3 },
-                            ) + fadeOut(animationSpec = tween(140)))
+                            ) + fadeOut(motionScheme.fastEffectsSpec()))
                     }
                 // No size animation. The island lives in a wrap_content view inside the status
                 // bar, so animating its size re-lays out the whole status bar on every frame.
@@ -165,7 +168,6 @@ fun StatusBarDynamicIslandContainer(
 
             StatusBarDynamicIslandChip(
                 viewModel = chip,
-                pageCount = chips.size,
                 cutoutSpec = cutoutSpec,
                 onChipBoundsChanged = { bounds -> anchorBounds = bounds },
                 onReservedWidthChanged = { width ->

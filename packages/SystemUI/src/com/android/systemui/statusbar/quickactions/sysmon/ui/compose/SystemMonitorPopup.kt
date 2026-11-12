@@ -33,8 +33,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +61,7 @@ import java.util.Locale
 private val PopupShape = RoundedCornerShape(32.dp)
 private const val HIGH_LOAD = 85
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SystemMonitorPopup(model: SystemMonitorPopupModel, modifier: Modifier = Modifier) {
     val stats = model.stats
@@ -80,7 +83,11 @@ fun SystemMonitorPopup(model: SystemMonitorPopupModel, modifier: Modifier = Modi
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f).padding(top = 8.dp),
                 )
-                IconButton(onClick = model.onClose, modifier = Modifier.padding(top = 6.dp)) {
+                IconButton(
+                    onClick = model.onClose,
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = stringResource(R.string.system_monitor_close),

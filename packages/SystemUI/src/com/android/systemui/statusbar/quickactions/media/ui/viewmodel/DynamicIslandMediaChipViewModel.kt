@@ -21,6 +21,7 @@ import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
+import com.android.systemui.media.dialog.MediaOutputDialogManager
 import com.android.systemui.statusbar.quickactions.media.domain.interactor.MediaControlChipInteractor
 import com.android.systemui.statusbar.quickactions.media.shared.model.MediaControlChipModel
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ChipIcon
@@ -44,6 +45,7 @@ class DynamicIslandMediaChipViewModel
 @AssistedInject
 constructor(
     mediaControlChipInteractor: MediaControlChipInteractor,
+    private val mediaOutputDialogManager: MediaOutputDialogManager,
 ) : DynamicIslandChipViewModel, ExclusiveActivatable() {
     private val hydrator: Hydrator = Hydrator("DynamicIslandMediaChipViewModel.hydrator")
     /**
@@ -83,7 +85,15 @@ constructor(
             chipText = normalizeSongTitle(model.songName.toString(), model.artistName?.toString()),
             colors = ColorsModel.DynamicIsland,
             hoverBehavior = createHoverBehavior(model),
-            popupContent = PopupContentModel.Media(model),
+            popupContent =
+                PopupContentModel.Media(
+                    model.copy(
+                        openOutputSwitcher =
+                            model.packageName?.let {
+                                { mediaOutputDialogManager.createAndShow(it, aboveStatusBar = true) }
+                            }
+                    )
+                ),
         )
     }
 

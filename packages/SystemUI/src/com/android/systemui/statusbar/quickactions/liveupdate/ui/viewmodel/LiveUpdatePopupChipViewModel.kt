@@ -40,6 +40,8 @@ import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveU
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdateProgress
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdateTimer
 import com.android.systemui.statusbar.quickactions.popups.shared.DynamicIslandFeatureSettings.LIVE_UPDATES
+import com.android.systemui.statusbar.quickactions.popups.shared.progressActions
+import com.android.systemui.statusbar.quickactions.popups.shared.toPopupActions
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ChipIcon
 import com.android.systemui.statusbar.quickactions.popups.ui.model.ColorsModel
 import com.android.systemui.statusbar.quickactions.popups.ui.model.PopupChipId
@@ -111,12 +113,14 @@ constructor(
             }
         }
 
+        val progress = content.progress()
         return LiveUpdate(
             title = content.title?.toString()?.trim()?.takeIf { it.isNotEmpty() },
             text = content.text?.toString()?.trim()?.takeIf { it.isNotEmpty() },
             shortText = shortText?.trim()?.takeIf { it.isNotEmpty() },
             timer = timer,
-            progress = content.progress(),
+            progress = progress,
+            actions = if (progress != null) entry.sbn.notification.progressActions() else emptyList(),
         )
     }
 
@@ -148,6 +152,7 @@ constructor(
                         update = update,
                         moreCount = more,
                         onOpen = onOpen,
+                        actions = update.actions.toPopupActions(),
                     )
                 ),
         )

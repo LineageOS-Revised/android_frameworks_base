@@ -16,20 +16,23 @@
 
 package com.android.systemui.statusbar.quickactions.popups.ui.compose
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.android.systemui.statusbar.quickactions.popups.shared.model.PopupActionModel
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PopupActionChips(
     actions: List<PopupActionModel>,
@@ -40,28 +43,51 @@ fun PopupActionChips(
         return
     }
 
+    val height = ButtonDefaults.ExtraSmallContainerHeight
+    val shapes = ButtonDefaults.shapesFor(height)
+    val label: @Composable (String) -> Unit = {
+        Text(
+            text = it,
+            style = ButtonDefaults.textStyleFor(height),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         actions.forEach { action ->
-            val backgroundColor =
-                if (action.emphasized) accent else Color.White.copy(alpha = 0.11f)
-            val contentColor =
-                if (action.emphasized) MaterialTheme.colorScheme.onPrimary else Color.White
-
-            Text(
-                text = action.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = contentColor,
-                modifier =
-                    Modifier.background(
-                            color = backgroundColor,
-                            shape = RoundedCornerShape(22.dp),
-                        )
-                        .clickable(onClick = action.onClick)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-            )
+            val buttonModifier = Modifier.weight(1f, fill = false).height(height)
+            if (action.emphasized) {
+                Button(
+                    onClick = action.onClick,
+                    shapes = shapes,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = accent,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    contentPadding = ButtonDefaults.ExtraSmallContentPadding,
+                    modifier = buttonModifier,
+                ) {
+                    label(action.label)
+                }
+            } else {
+                FilledTonalButton(
+                    onClick = action.onClick,
+                    shapes = shapes,
+                    colors =
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.11f),
+                            contentColor = Color.White,
+                        ),
+                    contentPadding = ButtonDefaults.ExtraSmallContentPadding,
+                    modifier = buttonModifier,
+                ) {
+                    label(action.label)
+                }
+            }
         }
     }
 }

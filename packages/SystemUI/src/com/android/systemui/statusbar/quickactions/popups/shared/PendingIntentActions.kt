@@ -16,11 +16,13 @@
 
 package com.android.systemui.statusbar.quickactions.popups.shared
 
+import android.app.Notification
 import android.app.PendingIntent
 import android.util.Log
 import com.android.systemui.ActivityIntentHelper
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.statusbar.NotificationLockscreenUserManager
+import com.android.systemui.statusbar.quickactions.popups.shared.model.PopupActionModel
 import com.android.systemui.statusbar.policy.KeyguardStateController
 
 fun PendingIntent?.toActivityLaunchAction(
@@ -60,4 +62,22 @@ fun PendingIntent?.toSendAction(): (() -> Unit)? {
                 }
         }
     }
+}
+
+/** A notification action button, kept as a [PendingIntent] so parsed items compare by value. */
+data class NotificationActionModel(val title: String, val intent: PendingIntent)
+
+/** The app's own buttons (cancel, pause, resume...), skipping inline replies. */
+fun Notification.progressActions(): List<NotificationActionModel> =
+    actions.orEmpty()
+        .filter { it.remoteInputs.isNullOrEmpty() }
+        .mapNotNull { action ->
+            val title = action.title?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            val intent = action.actionIntent
+            if (title != null && intent != null) NotificationActionModel(title, intent) else null
+        }
+        .take(2)
+
+fun List<NotificationActionModel>.toPopupActions(): List<PopupActionModel> = mapNotNull {
+    it.intent.toSendAction()?.let { onClick -> PopupActionModel(it.title, onClick) }
 }

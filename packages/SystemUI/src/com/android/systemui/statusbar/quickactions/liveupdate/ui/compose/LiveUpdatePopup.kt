@@ -21,12 +21,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,10 +41,12 @@ import androidx.compose.ui.unit.dp
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.liveupdate.shared.model.LiveUpdatePopupModel
+import com.android.systemui.statusbar.quickactions.popups.ui.compose.PopupActionChips
 import com.android.systemui.statusbar.quickactions.popups.ui.compose.rememberChronometerText
 
 private val PopupShape = RoundedCornerShape(32.dp)
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LiveUpdatePopup(model: LiveUpdatePopupModel, modifier: Modifier = Modifier) {
     val muted = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.73f)
@@ -112,18 +114,22 @@ fun LiveUpdatePopup(model: LiveUpdatePopupModel, modifier: Modifier = Modifier) 
             }
             update.progress?.let { progress ->
                 if (progress.isIndeterminate) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                 } else {
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = { progress.percent / 100f },
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                 }
             }
+            PopupActionChips(
+                actions = model.actions,
+                accent = MaterialTheme.colorScheme.primary,
+            )
             if (model.moreCount > 0) {
                 Text(
                     text = stringResource(R.string.dynamic_island_transfer_more, model.moreCount),

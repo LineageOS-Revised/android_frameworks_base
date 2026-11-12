@@ -17,6 +17,8 @@
 package com.android.systemui.statusbar.quickactions.liveupdate.shared.model
 
 import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.statusbar.quickactions.popups.shared.NotificationActionModel
+import com.android.systemui.statusbar.quickactions.popups.shared.model.PopupActionModel
 
 /** What an app's Live Update (promoted ongoing notification) shows in the island. */
 data class LiveUpdate(
@@ -25,6 +27,7 @@ data class LiveUpdate(
     val shortText: String?,
     val timer: LiveUpdateTimer?,
     val progress: LiveUpdateProgress?,
+    val actions: List<NotificationActionModel>,
 )
 
 data class LiveUpdateTimer(val baseElapsedRealtimeMs: Long, val isCountDown: Boolean)
@@ -37,4 +40,5 @@ data class LiveUpdatePopupModel(
     val update: LiveUpdate,
     val moreCount: Int,
     val onOpen: (() -> Unit)?,
+    val actions: List<PopupActionModel>,
 )
